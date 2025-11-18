@@ -1,4 +1,4 @@
-// PGN loader + parser + renderer (custom header, clean tags, remove empty braces, merge half-moves, remove %cal/%csl, wrap moves and annotations in <p>)
+// PGN loader + parser + renderer (custom header, clean tags, remove empty braces, merge half-moves, remove %cal/%csl, wrap moves/annotations in <p>)
 
 async function loadPGN() {
   const link = document.querySelector('link[rel="pgn"]');
@@ -65,7 +65,7 @@ function renderPGN(parsed) {
   let html = `<div>${headerLine}</div>`;
   if (eventLine) html += `<div>${eventLine}</div>`;
 
-  // Wrap each move/annotation in <p>
+  // Wrap each move/annotation in <p> instead of <pre>
   parsed.moveParts.forEach(part => {
     html += `<p>${part.trim()}</p>`;
   });
