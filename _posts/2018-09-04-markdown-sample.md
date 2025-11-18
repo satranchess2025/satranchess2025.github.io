@@ -1,7 +1,7 @@
 ---
 layout: post
 title:  "Markdown sample"
-date:   2016-09-04
+date:   2018-09-04
 ---
 
 ### Markdown test document
