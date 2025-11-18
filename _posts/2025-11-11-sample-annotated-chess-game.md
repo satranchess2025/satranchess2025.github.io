@@ -7,7 +7,7 @@ date:   2025-11-11
 ### Marius Gramb (2142) - GM Bogdan-Daniel Deac (2690)
 **Reykjavik Open, 2024.03.15**
 
-1. e4 c5 2. c3 d5 3. exd5 Qxd5 4. d4 Nf6 5. Nf3 e6 6. Na3 Qd8
+1\. e4 c5 2. c3 d5 3. exd5 Qxd5 4. d4 Nf6 5. Nf3 e6 6. Na3 Qd8
 
 <img src="https://lichess1.org/export/fen.gif?fen=rnbqkb1r%2Fpp3ppp%2F4pn2%2F2p5%2F3P4%2FN1P2N2%2FPP3PPP%2FR1BQKB1R+w+KQkq+-+2+7"/>
   
