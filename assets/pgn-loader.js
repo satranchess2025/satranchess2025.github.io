@@ -25,35 +25,44 @@ function parseMovesAndAnnotations(pgnText) {
     // Remove only engine/clock/cal tags inside annotations
     pgnText = pgnText.replace(/\{\s*\[%.*?\]\s*\}/g, '');
 
-    // Split PGN into tokens: move numbers, moves, annotations, results
-    const tokenRegex = /(\d+\.+)|(\{[^}]*\})|([^\s{}]+)/g;
-    const tokens = [];
+    // Extract all annotations in order
+    const annotationRegex = /\{([^}]*)\}/g;
+    const annotations = [];
     let match;
-    while ((match = tokenRegex.exec(pgnText)) !== null) {
-        tokens.push(match[0].trim());
+    while ((match = annotationRegex.exec(pgnText)) !== null) {
+        const ann = match[1].trim();
+        if (ann) annotations.push(ann);
     }
 
-    // Build single-line moves with annotations immediately after move
-    let html = '';
-    let movesLine = '';
-    tokens.forEach(token => {
-        if (token.match(/^\d+\.+$/)) {
-            // Move number
-            if (movesLine) {
-                html += `<p>${movesLine.trim()}</p>`;
-                movesLine = '';
-            }
-            movesLine += token + ' ';
-        } else if (token.startsWith('{') && token.endsWith('}')) {
-            // Annotation - new paragraph immediately after current moves
-            html += `<p>${token}</p>`;
-        } else {
-            // Move
-            movesLine += token + ' ';
+    // Remove all remaining PGN tags ([Event "…"]) from text
+    let movesText = pgnText.replace(/\[[^\]]+\]/g, '').trim();
+
+    // Collapse all whitespace into single spaces
+    movesText = movesText.replace(/\s+/g, ' ');
+
+    // Split movesText by space to insert annotations after the right move
+    const moves = [];
+    let annIndex = 0;
+    const moveTokens = movesText.split(' ');
+
+    for (let token of moveTokens) {
+        if (!token) continue;
+
+        if (token.startsWith('{') && token.endsWith('}')) {
+            // Skip, we'll use our annotations array
+            continue;
         }
-    });
-    if (movesLine) html += `<p>${movesLine.trim()}</p>`;
-    return html;
+
+        moves.push(token);
+
+        // If there’s an annotation for this move, insert it in a <p>
+        if (annIndex < annotations.length) {
+            moves.push(`<p>{${annotations[annIndex]}}</p>`);
+            annIndex++;
+        }
+    }
+
+    return `<p>${moves.join(' ').trim()}</p>`;
 }
 
 async function renderPGN() {
