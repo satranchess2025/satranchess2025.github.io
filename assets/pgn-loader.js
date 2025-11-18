@@ -1,4 +1,4 @@
-// Full PGN loader + parser + renderer using chess.js with annotations preserved
+// PGN loader + parser + renderer using chess.js with annotations preserved and correct move order
 
 async function loadPGN() {
     const link = document.querySelector('link[rel="pgn"]');
@@ -26,53 +26,36 @@ async function renderPGN() {
 
     const tags = chess.header();
 
-    // Header formatting
+    // Format header
     const whitePart = `${tags.WhiteTitle ? tags.WhiteTitle + ' ' : ''}${tags.White || ''} ${tags.WhiteElo ? '(' + tags.WhiteElo + ')' : ''}`.trim();
     const blackPart = `${tags.BlackTitle ? tags.BlackTitle + ' ' : ''}${tags.Black || ''} ${tags.BlackElo ? '(' + tags.BlackElo + ')' : ''}`.trim();
     const headerLine = `${whitePart} - ${blackPart}`;
     const eventLine = [tags.Event, tags.Date].filter(Boolean).join(', ');
 
-    // Remove PGN headers and engine/clock tags
-    let movesOnly = pgnText.replace(/^\[.*\]\s*$/gm, '').trim();
-    movesOnly = movesOnly.replace(/\[%.*?\]/g, ''); // remove engine/clock tags
-    movesOnly = movesOnly.replace(/\{\s*\}/g, ''); // remove empty braces
+    // Extract annotations from PGN
+    const annotationMap = {};
+    const moveAnnotationRegex = /(\d+\.\s*\S+|\.\.\.\s*\S+)\s*(\{[^}]*\})?/g;
+    let match;
+    let moveIndex = 0;
+    while ((match = moveAnnotationRegex.exec(pgnText)) !== null) {
+        if (match[2]) annotationMap[moveIndex] = match[2].trim();
+        moveIndex++;
+    }
 
-    // Split tokens keeping annotations {…} together
-    const tokens = movesOnly.match(/(\d+\.)|(\{[^}]*\})|(\S+)/g);
-
+    // Build moves text from chess.js history
+    const history = chess.history({ verbose: true });
     let movesText = '';
-    let moveNumber = 1;
-    let i = 0;
+    for (let i = 0; i < history.length; i += 2) {
+        const moveNumber = Math.floor(i / 2) + 1;
+        const whiteMove = history[i].san;
+        const blackMove = history[i + 1] ? history[i + 1].san : '';
 
-    while (i < tokens.length) {
-        if (tokens[i].endsWith('.')) {
-            // White move
-            let whiteMove = tokens[i + 1] || '';
-            let whiteAnn = '';
-            if (tokens[i + 2] && tokens[i + 2].startsWith('{')) {
-                whiteAnn = ' ' + tokens[i + 2];
-                i++;
-            }
-            chess.move(whiteMove, { sloppy: true });
+        const whiteAnn = annotationMap[i] ? ' ' + annotationMap[i] : '';
+        const blackAnn = annotationMap[i + 1] ? ' ' + annotationMap[i + 1] : '';
 
-            // Black move
-            let blackMove = '';
-            let blackAnn = '';
-            if (tokens[i + 2] && !tokens[i + 2].endsWith('.')) {
-                blackMove = tokens[i + 2];
-                if (tokens[i + 3] && tokens[i + 3].startsWith('{')) {
-                    blackAnn = ' ' + tokens[i + 3];
-                    i++;
-                }
-                chess.move(blackMove, { sloppy: true });
-            }
-
-            movesText += `${moveNumber}. ${whiteMove}${whiteAnn}${blackMove ? ' ' + blackMove + blackAnn : ''} `;
-            moveNumber++;
-            i += blackMove ? 4 : 2;
-        } else {
-            i++;
-        }
+        movesText += `${moveNumber}. ${whiteMove}${whiteAnn}`;
+        if (blackMove) movesText += ` ${blackMove}${blackAnn} `;
+        else movesText += ' ';
     }
 
     movesText = movesText.trim();
