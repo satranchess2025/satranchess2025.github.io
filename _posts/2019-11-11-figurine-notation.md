@@ -1,7 +1,7 @@
 ---
 layout: category-post
 title:  "Figurine notation"
-date:   2025-11-11
+date:   2019-11-11
 categories: writing
 ---
 
