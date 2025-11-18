@@ -1,5 +1,4 @@
-// PGN loader + parser + renderer (custom header format, clean evaluation/clock tags)
-// Loads a PGN file via <link rel="pgn" href="game.pgn"> and renders selected headers + moves, removing [%eval ...] and [%clk ...]
+// PGN loader + parser + renderer (custom header format, clean eval/clock tags, remove empty braces)
 
 async function loadPGN() {
   const link = document.querySelector('link[rel="pgn"]');
@@ -32,9 +31,11 @@ function parsePGN(pgnText) {
   }
 
   let moveText = moves.join(' ').replace(/\s+/g, ' ').trim();
-  // Remove [%eval ...] and [%clk ...] tags but keep other annotations
+  // Remove [%eval ...], [%clk ...] tags
   moveText = moveText.replace(/\[%eval[^\]]*\]/g, '');
   moveText = moveText.replace(/\[%clk[^\]]*\]/g, '');
+  // Remove empty braces {}
+  moveText = moveText.replace(/\{\s*\}/g, '');
 
   return { tags, moveText };
 }
