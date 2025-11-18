@@ -4,8 +4,6 @@ title:  "Sample annotated game"
 date:   2025-11-11
 ---
 
-Here is a sample annotated game in text with diagrams generated using Lichess' fen to gif export. English-language chess notation is automatically rendered as figurine notation using JavaScript.
-
 ## Marius Gramb (2142) - GM Bogdan-Daniel Deac (2690)
 ### Reykjavik Open, 2024.03.15
 
