@@ -1,4 +1,4 @@
-// PGN loader + parser + renderer using chess.js with proper move pairing and annotations
+// Full PGN loader + parser + renderer using chess.js with annotations preserved
 
 async function loadPGN() {
     const link = document.querySelector('link[rel="pgn"]');
@@ -26,26 +26,56 @@ async function renderPGN() {
 
     const tags = chess.header();
 
-    // Custom header format
+    // Header formatting
     const whitePart = `${tags.WhiteTitle ? tags.WhiteTitle + ' ' : ''}${tags.White || ''} ${tags.WhiteElo ? '(' + tags.WhiteElo + ')' : ''}`.trim();
     const blackPart = `${tags.BlackTitle ? tags.BlackTitle + ' ' : ''}${tags.Black || ''} ${tags.BlackElo ? '(' + tags.BlackElo + ')' : ''}`.trim();
     const headerLine = `${whitePart} - ${blackPart}`;
     const eventLine = [tags.Event, tags.Date].filter(Boolean).join(', ');
 
-    // Use chess.js to get all moves in order
-    const moves = chess.history({ verbose: true });
+    // Remove PGN headers and engine/clock tags
+    let movesOnly = pgnText.replace(/^\[.*\]\s*$/gm, '').trim();
+    movesOnly = movesOnly.replace(/\[%.*?\]/g, ''); // remove engine/clock tags
+    movesOnly = movesOnly.replace(/\{\s*\}/g, ''); // remove empty braces
+
+    // Split tokens keeping annotations {…} together
+    const tokens = movesOnly.match(/(\d+\.)|(\{[^}]*\})|(\S+)/g);
 
     let movesText = '';
-    for (let i = 0; i < moves.length; i += 2) {
-        const moveNumber = Math.floor(i / 2) + 1;
-        const whiteMove = moves[i] ? moves[i].san : '';
-        const blackMove = moves[i + 1] ? moves[i + 1].san : '';
-        movesText += `${moveNumber}. ${whiteMove}${blackMove ? ' ' + blackMove : ''} `;
+    let moveNumber = 1;
+    let i = 0;
+
+    while (i < tokens.length) {
+        if (tokens[i].endsWith('.')) {
+            // White move
+            let whiteMove = tokens[i + 1] || '';
+            let whiteAnn = '';
+            if (tokens[i + 2] && tokens[i + 2].startsWith('{')) {
+                whiteAnn = ' ' + tokens[i + 2];
+                i++;
+            }
+            chess.move(whiteMove, { sloppy: true });
+
+            // Black move
+            let blackMove = '';
+            let blackAnn = '';
+            if (tokens[i + 2] && !tokens[i + 2].endsWith('.')) {
+                blackMove = tokens[i + 2];
+                if (tokens[i + 3] && tokens[i + 3].startsWith('{')) {
+                    blackAnn = ' ' + tokens[i + 3];
+                    i++;
+                }
+                chess.move(blackMove, { sloppy: true });
+            }
+
+            movesText += `${moveNumber}. ${whiteMove}${whiteAnn}${blackMove ? ' ' + blackMove + blackAnn : ''} `;
+            moveNumber++;
+            i += blackMove ? 4 : 2;
+        } else {
+            i++;
+        }
     }
 
     movesText = movesText.trim();
-
-    // Append game result
     movesText += ` ${tags.Result || '*'}`;
 
     const container = document.getElementById('pgn-output');
