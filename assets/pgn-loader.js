@@ -1,4 +1,4 @@
-// PGN loader + parser + renderer using chess.js with validated moves and annotations
+// PGN loader + parser + renderer using chess.js with proper move pairing and annotations
 
 async function loadPGN() {
     const link = document.querySelector('link[rel="pgn"]');
@@ -19,9 +19,7 @@ async function renderPGN() {
     if (!pgnText) return;
 
     const chess = new Chess();
-    const loaded = chess.load_pgn(pgnText);
-
-    if (!loaded) {
+    if (!chess.load_pgn(pgnText)) {
         console.error('Invalid PGN');
         return;
     }
@@ -34,60 +32,22 @@ async function renderPGN() {
     const headerLine = `${whitePart} - ${blackPart}`;
     const eventLine = [tags.Event, tags.Date].filter(Boolean).join(', ');
 
-    // Parse PGN moves including meaningful annotations
-    let movesOnly = pgnText.replace(/^\[.*\]\s*$/gm, '').trim(); // remove headers
-    movesOnly = movesOnly.replace(/\[%.*?\]/g, ''); // remove engine tags
-    movesOnly = movesOnly.replace(/\{\s*\}/g, ''); // remove empty braces
-
-    // Split all tokens: move numbers, moves, annotations
-    const tokens = movesOnly.match(/(\d+\.)|(\{[^}]*\})|(\S+)/g);
+    // Use chess.js to get all moves in order
+    const moves = chess.history({ verbose: true });
 
     let movesText = '';
-    let moveNumber = 1;
-    let moveIndex = 0;
-
-    while (moveIndex < tokens.length) {
-        if (tokens[moveIndex] && tokens[moveIndex].endsWith('.')) {
-            const whiteMoveRaw = tokens[moveIndex + 1] || '';
-            const blackMoveRaw = tokens[moveIndex + 2] && !tokens[moveIndex + 2].endsWith('.') ? tokens[moveIndex + 2] : '';
-
-            // Validate moves using chess.js
-            const legalWhite = chess.move(whiteMoveRaw, { sloppy: true });
-            let legalBlack = null;
-            if (blackMoveRaw) legalBlack = chess.move(blackMoveRaw, { sloppy: true });
-
-            let whiteMoveText = legalWhite ? whiteMoveRaw : whiteMoveRaw;
-            let blackMoveText = legalBlack ? blackMoveRaw : blackMoveRaw;
-
-            // Attach annotations following moves if present
-            if (tokens[moveIndex + 3] && tokens[moveIndex + 3].startsWith('{')) {
-                whiteMoveText += ' ' + tokens[moveIndex + 3];
-            }
-            if (tokens[moveIndex + 4] && tokens[moveIndex + 4].startsWith('{')) {
-                blackMoveText += ' ' + tokens[moveIndex + 4];
-            }
-
-            movesText += `${moveNumber}. ${whiteMoveText}`;
-            if (blackMoveText) movesText += ` ${blackMoveText} `;
-            else movesText += ' ';
-
-            moveNumber++;
-            moveIndex += blackMoveRaw ? 5 : 3;
-        } else {
-            moveIndex++;
-        }
+    for (let i = 0; i < moves.length; i += 2) {
+        const moveNumber = Math.floor(i / 2) + 1;
+        const whiteMove = moves[i] ? moves[i].san : '';
+        const blackMove = moves[i + 1] ? moves[i + 1].san : '';
+        movesText += `${moveNumber}. ${whiteMove}${blackMove ? ' ' + blackMove : ''} `;
     }
 
     movesText = movesText.trim();
 
-    // Append game result at the end
-    if (tags.Result) {
-        movesText += ` ${tags.Result}`;
-    } else {
-        movesText += ` ${chess.game_over() ? (chess.turn() === 'w' ? '0-1' : '1-0') : '*'}`;
-    }
+    // Append game result
+    movesText += ` ${tags.Result || '*'}`;
 
-    // Output into three paragraphs: header, event, moves with annotations
     const container = document.getElementById('pgn-output');
     container.innerHTML = `<p>${headerLine}</p><p>${eventLine}</p><p>${movesText}</p>`;
 }
