@@ -1,5 +1,6 @@
 // PGN loader + parser + renderer using chess.js
-// Engine/clock tags [%eval ...] [%clk ...] are removed; other comments preserved and shown next to moves
+// Engine/clock tags [%eval ...] [%clk ...] are removed
+// Meaningful comments containing moves or symbols are displayed next to moves
 
 async function loadPGN() {
     const link = document.querySelector('link[rel="pgn"]');
@@ -16,27 +17,30 @@ async function loadPGN() {
 }
 
 function removeEngineClockTags(text) {
-    // Only remove [%...] tags, keep other comments intact
     return text.replace(/\[%.*?\]/g, '');
 }
 
 function buildHeader(tags) {
-    const whitePart = [tags.WhiteTitle, tags.White, tags.WhiteElo ? `(${tags.WhiteElo})` : null].filter(Boolean).join(' ');
-    const blackPart = [tags.BlackTitle, tags.Black, tags.BlackElo ? `(${tags.BlackElo})` : null].filter(Boolean).join(' ');
-    const headerLine = `${whitePart} - ${blackPart}`;
+    const formatPlayer = (title, name, elo) => [title, name, elo ? `(${elo})` : null].filter(Boolean).join(' ');
+    const headerLine = `${formatPlayer(tags.WhiteTitle, tags.White, tags.WhiteElo)} - ${formatPlayer(tags.BlackTitle, tags.Black, tags.BlackElo)}`;
     const eventLine = [tags.Event, tags.Date].filter(Boolean).join(', ');
     return { headerLine, eventLine };
 }
 
+function isMeaningfulComment(comment) {
+    if (!comment) return false;
+    const clean = comment.replace(/[\{\}]/g, '').trim();
+    return /[A-Za-z0-9!\?\#\+=]/.test(clean); // letters, digits, or chess symbols
+}
+
 function extractAnnotations(pgnText) {
     const annotationMap = {};
-    // Match all moves with optional {…} comments
     const regex = /(\d+\.\s*\S+|\.\.\.\s*\S+)(\s*\{[^}]*\})?/g;
     let match, moveIndex = 0;
 
     while ((match = regex.exec(pgnText)) !== null) {
         const comment = match[2]?.trim() || '';
-        if (comment) annotationMap[moveIndex] = comment;
+        if (isMeaningfulComment(comment)) annotationMap[moveIndex] = comment;
         moveIndex++;
     }
 
@@ -45,32 +49,25 @@ function extractAnnotations(pgnText) {
 
 function buildMovesText(chess, annotationMap) {
     const history = chess.history({ verbose: true });
-    let movesText = '';
-
-    for (let i = 0; i < history.length; i += 2) {
+    return history.reduce((text, move, i) => {
         const moveNumber = Math.floor(i / 2) + 1;
-        const whiteMove = history[i]?.san || '';
-        const blackMove = history[i + 1]?.san || '';
+        const san = move.san;
+        const annotation = annotationMap[i] ? ' ' + annotationMap[i] : '';
 
-        const whiteAnn = annotationMap[i] ? ' ' + annotationMap[i] : '';
-        const blackAnn = annotationMap[i + 1] ? ' ' + annotationMap[i + 1] : '';
-
-        movesText += `${moveNumber}. ${whiteMove}${whiteAnn}`;
-        if (blackMove) movesText += ` ${blackMove}${blackAnn} `;
-        else movesText += ' ';
-    }
-
-    movesText = movesText.trim();
-    movesText += ` ${chess.header().Result || '*'}`;
-
-    return movesText;
+        if (i % 2 === 0) {
+            // White move
+            return text + `${moveNumber}. ${san}${annotation} `;
+        } else {
+            // Black move
+            return text + `${san}${annotation} `;
+        }
+    }, '').trim() + ` ${chess.header().Result || '*'}`;
 }
 
 async function renderPGN() {
     let pgnText = await loadPGN();
     if (!pgnText) return;
 
-    // Remove only engine/clock tags, keep other comments
     pgnText = removeEngineClockTags(pgnText);
 
     const chess = new Chess();
