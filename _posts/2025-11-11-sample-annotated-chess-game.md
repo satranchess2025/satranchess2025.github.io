@@ -13,7 +13,7 @@ date:   2025-11-11
   
 The most common plan here is 7. Nc2 to play 8. Bd3 next and still not letting the IQP after cxd4.
 
-7. Nc4 Be7 8. Nce5 O-O 9. Be2
+7\. Nc4 Be7 8. Nce5 O-O 9. Be2
 
 <img src="https://lichess1.org/export/fen.gif?fen=rnbq1rk1%2Fpp2bppp%2F4pn2%2F2p1N3%2F3P4%2F2P2N2%2FPP2BPPP%2FR1BQK2R+b+KQ+-+7+9"/>
 
@@ -31,16 +31,16 @@ A rather typical queenless middlegame position from Alapin Sicilian. Both sides 
 
 The first instructive moment of the game for me as 11... Nbd7 looked more normal to play. Black immediately starts moving their pawn majority by playing f6 and e5 thus avoid simplifications.
 
-12. O-O f6 13. Nef3 Rd8 14. c4 Nc7 15. Be3 e5 16. Nc2 Bf5 17. Rac1 Nba6!
+12\. O-O f6 13. Nef3 Rd8 14. c4 Nc7 15. Be3 e5 16. Nc2 Bf5 17. Rac1 Nba6!
 
 <img src="https://lichess1.org/export/fen.gif?fen=r2qnrk1%2Fpb1nbppp%2F1p2p3%2F3pP3%2F3P4%2F5NP1%2FPPQN1PBP%2FR1B2RK1+w+-+-+0+12" />
 
 Another important manuvre to get to d3-square.
 
-8. a3 Nc5 19. Bxc5 Bxc5
+18\. a3 Nc5 19. Bxc5 Bxc5
 
- <img src="https://lichess1.org/export/fen.gif?fen=r2qnrk1%2Fpb1nbppp%2F1p2p3%2F3pP3%2F3P4%2F5NP1%2FPPQN1PBP%2FR1B2RK1+w+-+-+0+12" />
+<img src="https://lichess1.org/export/fen.gif?fen=r2qnrk1%2Fpb1nbppp%2F1p2p3%2F3pP3%2F3P4%2F5NP1%2FPPQN1PBP%2FR1B2RK1+w+-+-+0+12" />
 
- Black gets the bishop pair.
+Black gets the bishop pair.
 
  [...]
