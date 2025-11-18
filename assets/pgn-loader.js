@@ -1,4 +1,4 @@
-// PGN loader + parser + renderer (custom header format, clean eval/clock tags, remove empty braces)
+// PGN loader + parser + renderer (custom header, clean tags, remove empty braces, merge half-moves)
 
 async function loadPGN() {
   const link = document.querySelector('link[rel="pgn"]');
@@ -36,6 +36,10 @@ function parsePGN(pgnText) {
   moveText = moveText.replace(/\[%clk[^\]]*\]/g, '');
   // Remove empty braces {}
   moveText = moveText.replace(/\{\s*\}/g, '');
+
+  // Merge half-moves where nothing is between them
+  // e.g., '1. e4 1... c5' -> '1. e4 c5'
+  moveText = moveText.replace(/(\d+\.\s*\S+)\s+\1\.\.\.\s*(\S+)/g, '$1 $2');
 
   return { tags, moveText };
 }
