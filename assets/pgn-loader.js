@@ -41,7 +41,13 @@ async function renderPGN() {
     const blackMove = movesArray[i + 1] ? ' ' + movesArray[i + 1] : '';
     movesText += `${moveNumber}. ${whiteMove}${blackMove} `;
   }
+
   movesText = movesText.trim();
+
+  // 3. Append the game result at the end
+  if (tags.Result) {
+    movesText += ` ${tags.Result}`;
+  }
 
   // Output into two paragraphs
   const container = document.getElementById('pgn-output');
