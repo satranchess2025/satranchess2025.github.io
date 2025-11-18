@@ -3,7 +3,7 @@
 
 async function loadPGN() {
     const link = document.querySelector('link[rel="pgn"]');
-    if (!link || !link.href) return null;
+    if (!link?.href) return null;
 
     try {
         const response = await fetch(link.href);
@@ -15,51 +15,42 @@ async function loadPGN() {
     }
 }
 
-async function renderPGN() {
-    let pgnText = await loadPGN();
-    if (!pgnText) return;
+function cleanAnnotations(annotation) {
+    if (!annotation) return '';
+    const clean = annotation.replace(/\[%.*?\]/g, '').replace(/[\{\}]/g, '').trim();
+    return /[A-Za-z0-9!\?\#\+=]/.test(clean) ? `{${clean}}` : '';
+}
 
-    // Remove engine/clock tags
-    pgnText = pgnText.replace(/\[%.*?\]/g, '');
-
-    const chess = new Chess();
-    if (!chess.load_pgn(pgnText)) {
-        console.error('Invalid PGN');
-        return;
-    }
-
-    const tags = chess.header();
-
-    // Format header
-    const whitePart = `${tags.WhiteTitle ? tags.WhiteTitle + ' ' : ''}${tags.White || ''} ${tags.WhiteElo ? '(' + tags.WhiteElo + ')' : ''}`.trim();
-    const blackPart = `${tags.BlackTitle ? tags.BlackTitle + ' ' : ''}${tags.Black || ''} ${tags.BlackElo ? '(' + tags.BlackElo + ')' : ''}`.trim();
+function buildHeader(tags) {
+    const whitePart = [tags.WhiteTitle, tags.White, tags.WhiteElo ? `(${tags.WhiteElo})` : null].filter(Boolean).join(' ');
+    const blackPart = [tags.BlackTitle, tags.Black, tags.BlackElo ? `(${tags.BlackElo})` : null].filter(Boolean).join(' ');
     const headerLine = `${whitePart} - ${blackPart}`;
     const eventLine = [tags.Event, tags.Date].filter(Boolean).join(', ');
+    return { headerLine, eventLine };
+}
 
-    // Extract annotations from PGN
+function extractAnnotations(pgnText) {
     const annotationMap = {};
-    const moveAnnotationRegex = /(\d+\.\s*\S+|\.\.\.\s*\S+)\s*(\{[^}]*\})?/g;
-    let match;
-    let moveIndex = 0;
-    while ((match = moveAnnotationRegex.exec(pgnText)) !== null) {
-        if (match[2]) {
-            // Remove any engine/clock tags inside the annotation (e.g. [%eval ...], [%clk ...])
-            const annInner = match[2].replace(/\[%.*?\]/g, '').replace(/[\{\}]/g, '').trim();
-            // Keep annotation if it contains letters, digits, or common annotation symbols (! ? # + =)
-            if (annInner && /[A-Za-z0-9!\?\#\+=]/.test(annInner)) {
-                annotationMap[moveIndex] = '{' + annInner + '}';
-            }
-        }
+    const regex = /(\d+\.\s*\S+|\.\.\.\s*\S+)\s*(\{[^}]*\})?/g;
+    let match, moveIndex = 0;
+
+    while ((match = regex.exec(pgnText)) !== null) {
+        const cleaned = cleanAnnotations(match[2]);
+        if (cleaned) annotationMap[moveIndex] = cleaned;
         moveIndex++;
     }
 
-    // Build moves text from chess.js history
+    return annotationMap;
+}
+
+function buildMovesText(chess, annotationMap) {
     const history = chess.history({ verbose: true });
     let movesText = '';
+
     for (let i = 0; i < history.length; i += 2) {
         const moveNumber = Math.floor(i / 2) + 1;
-        const whiteMove = history[i].san;
-        const blackMove = history[i + 1] ? history[i + 1].san : '';
+        const whiteMove = history[i]?.san || '';
+        const blackMove = history[i + 1]?.san || '';
 
         const whiteAnn = annotationMap[i] ? ' ' + annotationMap[i] : '';
         const blackAnn = annotationMap[i + 1] ? ' ' + annotationMap[i + 1] : '';
@@ -70,10 +61,32 @@ async function renderPGN() {
     }
 
     movesText = movesText.trim();
-    movesText += ` ${tags.Result || '*'}`;
+    movesText += ` ${chess.header().Result || '*'}`;
+
+    return movesText;
+}
+
+async function renderPGN() {
+    let pgnText = await loadPGN();
+    if (!pgnText) return;
+
+    // Remove engine/clock tags globally
+    pgnText = pgnText.replace(/\[%.*?\]/g, '');
+
+    const chess = new Chess();
+    if (!chess.load_pgn(pgnText)) {
+        console.error('Invalid PGN');
+        return;
+    }
+
+    const tags = chess.header();
+    const { headerLine, eventLine } = buildHeader(tags);
+    const annotationMap = extractAnnotations(pgnText);
+    const movesText = buildMovesText(chess, annotationMap);
 
     const container = document.getElementById('pgn-output');
-    container.innerHTML = `<p>${headerLine}</p><p>${eventLine}</p><p>${movesText}</p>`;
+    // Güvenli text render
+    container.textContent = `${headerLine}\n${eventLine}\n${movesText}`;
 }
 
 document.addEventListener('DOMContentLoaded', renderPGN);
