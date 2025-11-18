@@ -4,14 +4,43 @@ title:  "Sample annotated chess game"
 date:   2025-11-11
 ---
 
-Lorem ipsizzle funky fresh i'm in the shizzle boom shackalack, consectetizzle adipiscing my shizz. Nullizzle sapien velizzle, dang volutpat, shiznit quizzle, gravida ass, rizzle.
+### Marius Gramb (2142) - GM Bogdan-Daniel Deac (2690)
+**Reykjavik Open, 2024.03.15**
 
-```html
-<div class="mb-1">
-  test
-</div>
-```
+1. e4 c5 2. c3 d5 3. exd5 Qxd5 4. d4 Nf6 5. Nf3 e6 6. Na3 Qd8
 
-Lorem ipsizzle funky fresh i'm in the shizzle boom shackalack, consectetizzle adipiscing my shizz. Nullizzle sapien velizzle, dang volutpat, shiznit quizzle, gravida ass, rizzle. Pot get down get down tortor. Sed erizzle. Black go to hizzle dolizzle dapibizzle turpis fo shizzle my nizzle yo. Maurizzle pellentesque nibh et check it out. Bow wow wow check it out tortizzle. Pellentesque for sure rhoncizzle bow wow wow. In owned habitasse brizzle dictumst. Nizzle dapibizzle. Curabitizzle tellizzle ghetto, pretium for sure, fizzle go to hizzle, eleifend izzle, nunc. Dope suscipizzle. Integizzle boom shackalack velit ass purus.
+<img src="https://lichess1.org/export/fen.gif?fen=rnbqkb1r%2Fpp3ppp%2F4pn2%2F2p5%2F3P4%2FN1P2N2%2FPP3PPP%2FR1BQKB1R+w+KQkq+-+2+7"/>
+  
+7. Nc2 to play Bd3 next and still not letting the IQP after cxd4 is the most common plan here.
 
-Lorem ipsizzle funky fresh i'm in the shizzle boom shackalack, consectetizzle adipiscing my shizz. Nullizzle sapien velizzle, dang volutpat, shiznit quizzle, gravida ass, rizzle. Pot get down get down tortor. Sed erizzle. Black go to hizzle dolizzle dapibizzle turpis fo shizzle my nizzle yo. Maurizzle pellentesque nibh et check it out. Bow wow wow check it out tortizzle. Pellentesque for sure rhoncizzle bow wow wow. In owned habitasse brizzle dictumst. Nizzle dapibizzle. Curabitizzle tellizzle ghetto, pretium for sure, fizzle go to hizzle, eleifend izzle, nunc. Dope suscipizzle. Integizzle boom shackalack velit ass purus.
+7. Nc4 Be7 8. Nce5 O-O 9. Be2
+
+<img src="https://lichess1.org/export/fen.gif?fen=rnbq1rk1%2Fpp2bppp%2F4pn2%2F2p1N3%2F3P4%2F2P2N2%2FPP2BPPP%2FR1BQK2R+b+KQ+-+7+9"/>
+
+A new move to be able to capture with the queen, white did not play 10.Bd3.
+
+9... cxd4 10. Qxd4 Qxd4 11. Nxd4
+
+ <img src="https://lichess1.org/export/fen.gif?fen=rnb2rk1%2Fpp2bppp%2F4pn2%2F4N3%2F3N4%2F2P5%2FPP2BPPP%2FR1B1K2R+b+KQ+-+0+11" />
+
+A rather typical queenless middlegame position from Alapin Sicilian. Both sides have their pawn majorities on each side of the board.
+
+11... Nd5!
+
+<img src="https://lichess1.org/export/fen.gif?fen=rnb2rk1%2Fpp2bppp%2F4p3%2F3nN3%2F3N4%2F2P5%2FPP2BPPP%2FR1B1K2R+w+KQ+-+1+12" />
+
+The first instructive moment of the game for me as 11... Nbd7 looked more normal to play. Black immediately starts moving their pawn majority by playing f6 and e5 thus avoid simplifications.
+
+12. O-O f6 13. Nef3 Rd8 14. c4 Nc7 15. Be3 e5 16. Nc2 Bf5 17. Rac1 Nba6!
+
+<img src="https://lichess1.org/export/fen.gif?fen=r2qnrk1%2Fpb1nbppp%2F1p2p3%2F3pP3%2F3P4%2F5NP1%2FPPQN1PBP%2FR1B2RK1+w+-+-+0+12" />
+
+Another important manuvre to get to d3-square.
+
+8. a3 Nc5 19. Bxc5 Bxc5
+
+ <img src="https://lichess1.org/export/fen.gif?fen=r2qnrk1%2Fpb1nbppp%2F1p2p3%2F3pP3%2F3P4%2F5NP1%2FPPQN1PBP%2FR1B2RK1+w+-+-+0+12" />
+
+ Black gets the bishop pair.
+
+ [...]
