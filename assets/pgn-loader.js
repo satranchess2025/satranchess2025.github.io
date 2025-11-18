@@ -1,5 +1,6 @@
-// Simple PGN loader + renderer using chess.js
-// Only engine/clock tags [%...] are removed; all other comments preserved
+// PGN loader + renderer using chess.js
+// Preserve all moves, comments, and engine/clock tags
+// Header includes titles, names, Elo, site, and date
 
 async function loadPGN() {
     const link = document.querySelector('link[rel="pgn"]');
@@ -15,16 +16,26 @@ async function loadPGN() {
     }
 }
 
-function cleanPGN(pgnText) {
-    // Remove only [%...] tags, keep everything else intact
-    return pgnText.replace(/\[%.*?\]/g, '');
+function buildHeader(tags) {
+    const formatPlayer = (title, name, elo) => {
+        const parts = [];
+        if (title) parts.push(title);
+        if (name) parts.push(name);
+        if (elo) parts.push(`(${elo})`);
+        return parts.join(' ');
+    };
+
+    const white = formatPlayer(tags.WhiteTitle, tags.White, tags.WhiteElo);
+    const black = formatPlayer(tags.BlackTitle, tags.Black, tags.BlackElo);
+    const headerLine = `${white} - ${black}`;
+    const eventLine = [tags.Site, tags.Date].filter(Boolean).join(', ');
+
+    return `${headerLine}\n${eventLine}`;
 }
 
 async function renderPGN() {
-    let pgnText = await loadPGN();
+    const pgnText = await loadPGN();
     if (!pgnText) return;
-
-    pgnText = cleanPGN(pgnText);
 
     const chess = new Chess();
     if (!chess.load_pgn(pgnText, { sloppy: true })) {
@@ -32,17 +43,14 @@ async function renderPGN() {
         return;
     }
 
-    // Extract header info
     const tags = chess.header();
-    const formatPlayer = (title, name, elo) => [title, name, elo ? `(${elo})` : null].filter(Boolean).join(' ');
-    const headerLine = `${formatPlayer(tags.WhiteTitle, tags.White, tags.WhiteElo)} - ${formatPlayer(tags.BlackTitle, tags.Black, tags.BlackElo)}`;
-    const eventLine = [tags.Event, tags.Date].filter(Boolean).join(', ');
+    const header = buildHeader(tags);
 
-    // Render moves from the PGN
-    const movesText = chess.pgn().replace(/\[%.*?\]/g, ''); // removes engine/clock tags from final output
+    // Keep moves exactly as in PGN (including comments and engine/clock tags)
+    const movesText = chess.pgn();
 
     const container = document.getElementById('pgn-output');
-    container.textContent = `${headerLine}\n${eventLine}\n${movesText}`;
+    container.textContent = `${header}\n${movesText}`;
 }
 
 document.addEventListener('DOMContentLoaded', renderPGN);
