@@ -1,5 +1,5 @@
 // PGN loader + renderer using chess.js
-// Header in <p>, moves grouped together, each annotation in its own <p>
+// Moves numbered correctly, annotations after moves in their own <p>, engine/clock/cal removed
 
 async function loadPGN() {
     const link = document.querySelector('link[rel="pgn"]');
@@ -16,13 +16,8 @@ async function loadPGN() {
 }
 
 function buildHeader(tags) {
-    const formatPlayer = (title, name, elo) => {
-        const parts = [];
-        if (title) parts.push(title);
-        if (name) parts.push(name);
-        if (elo) parts.push(`(${elo})`);
-        return parts.join(' ');
-    };
+    const formatPlayer = (title, name, elo) =>
+        [title, name, elo ? `(${elo})` : ''].filter(Boolean).join(' ');
 
     const white = formatPlayer(tags.WhiteTitle, tags.White, tags.WhiteElo);
     const black = formatPlayer(tags.BlackTitle, tags.Black, tags.BlackElo);
@@ -31,41 +26,54 @@ function buildHeader(tags) {
     return `<p>${white} - ${black}<br>${siteDate}</p>`;
 }
 
-function extractMovesWithParagraphs(pgnText) {
-    // Remove header lines starting with '['
-    const lines = pgnText.split('\n');
-    let movesLines = lines.filter(line => !line.startsWith('['));
-    let movesText = movesLines.join(' ').trim();
+function parseMovesWithAnnotations(pgnText) {
+    // Remove header lines
+    const lines = pgnText.split('\n').filter(line => !line.startsWith('['));
+    let text = lines.join(' ').trim();
 
     // Remove engine/clock/cal tags: { [%eval ...] }, { [%clk ...] }, { [%cal ...] }
-    movesText = movesText.replace(/\{\s*\[%.*?\]\s*\}/g, '').trim();
+    text = text.replace(/\{\s*\[%.*?\]\s*\}/g, '').trim();
 
-    // Split into segments: annotations { ... } and plain moves
-    const segments = movesText.split(/(\{[^}]*\})/g).filter(Boolean);
-
-    let html = '';
-    let movesBuffer = '';
-
-    for (let seg of segments) {
-        seg = seg.trim();
-        if (!seg) continue;
-
-        if (seg.startsWith('{') && seg.endsWith('}')) {
-            // Flush buffered moves as one paragraph
-            if (movesBuffer) {
-                html += `<p>${movesBuffer.trim()}</p>`;
-                movesBuffer = '';
-            }
-            // Add the annotation as its own paragraph
-            html += `<p>${seg}</p>`;
-        } else {
-            // Accumulate moves
-            movesBuffer += ' ' + seg;
+    // Extract all annotations with positions
+    const annotationRegex = /\{([^}]*)\}/g;
+    const annotations = [];
+    let match;
+    while ((match = annotationRegex.exec(text)) !== null) {
+        const ann = match[1].trim();
+        if (ann) {
+            annotations.push({ index: match.index, text: `{${ann}}` });
         }
     }
 
-    // Flush any remaining moves
-    if (movesBuffer) html += `<p>${movesBuffer.trim()}</p>`;
+    // Remove annotations from moves text for clean parsing
+    const movesText = text.replace(annotationRegex, '').replace(/\s+/g, ' ').trim();
+
+    // Use chess.js to get move history
+    const chess = new Chess();
+    chess.load_pgn(pgnText, { sloppy: true });
+    const history = chess.history({ verbose: true });
+
+    let html = '';
+    let moveNumber = 1;
+    let charIndex = 0; // Track position in movesText for annotation placement
+
+    for (let i = 0; i < history.length; i += 2) {
+        // Build the line for white and black
+        let line = `${moveNumber}. ${history[i].san}`;
+        if (history[i + 1]) line += ` ${history[i + 1].san}`;
+
+        html += `<p>${line}</p>`; // Add moves as a paragraph
+
+        // Find annotations that occur within this move text
+        annotations.forEach(a => {
+            if (a.index >= charIndex && a.index < charIndex + line.length) {
+                html += `<p>${a.text}</p>`;
+            }
+        });
+
+        charIndex += line.length + 1; // update charIndex for next move
+        moveNumber++;
+    }
 
     return html;
 }
@@ -75,18 +83,13 @@ async function renderPGN() {
     if (!pgnText) return;
 
     const chess = new Chess();
-    if (!chess.load_pgn(pgnText, { sloppy: true })) {
-        console.error('Invalid PGN');
-        return;
-    }
-
+    chess.load_pgn(pgnText, { sloppy: true });
     const tags = chess.header();
+
     const headerHTML = buildHeader(tags);
+    const movesHTML = parseMovesWithAnnotations(pgnText);
 
-    const movesHTML = extractMovesWithParagraphs(pgnText);
-
-    const container = document.getElementById('pgn-output');
-    container.innerHTML = headerHTML + movesHTML;
+    document.getElementById('pgn-output').innerHTML = headerHTML + movesHTML;
 }
 
 document.addEventListener('DOMContentLoaded', renderPGN);
