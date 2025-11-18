@@ -11,9 +11,9 @@ date:   2025-11-11
 
 <img src="https://lichess1.org/export/fen.gif?fen=rnbqkb1r%2Fpp3ppp%2F4pn2%2F2p5%2F3P4%2FN1P2N2%2FPP3PPP%2FR1BQKB1R+w+KQkq+-+2+7"/>
   
- 7. Nc2 to play Bd3 next and still not letting the IQP after cxd4 is the most common plan here.
+The most common plan here is 7. Nc2 to play 8. Bd3 next and still not letting the IQP after cxd4.
 
- 7. Nc4 Be7 8. Nce5 O-O 9. Be2
+7. Nc4 Be7 8. Nce5 O-O 9. Be2
 
 <img src="https://lichess1.org/export/fen.gif?fen=rnbq1rk1%2Fpp2bppp%2F4pn2%2F2p1N3%2F3P4%2F2P2N2%2FPP2BPPP%2FR1BQK2R+b+KQ+-+7+9"/>
 
