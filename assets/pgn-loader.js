@@ -27,53 +27,51 @@ function buildHeader(tags) {
 }
 
 function parseMovesWithAnnotations(pgnText) {
-    // Remove engine/clock/cal tags like { [%eval ...] }, { [%clk ...] }, { [%cal ...] }
-    let cleanPGN = pgnText.replace(/\{\s*\[%.*?\]\s*\}/g, '').trim();
+    // Remove only engine/clock/cal tags from annotations
+    const annotationCleaner = text =>
+        text.replace(/\[\%.*?\]/g, '').trim();
 
-    // Extract all annotations with their position in text
+    // Extract all annotations in order
     const annotationRegex = /\{([^}]*)\}/g;
     const annotations = [];
     let match;
-    while ((match = annotationRegex.exec(cleanPGN)) !== null) {
-        const ann = match[1].trim();
-        if (ann) annotations.push({ index: match.index, text: `{${ann}}` });
+    while ((match = annotationRegex.exec(pgnText)) !== null) {
+        const ann = annotationCleaner(match[1]);
+        if (ann) annotations.push(ann);
     }
-
-    // Remove annotations from PGN for move parsing
-    cleanPGN = cleanPGN.replace(annotationRegex, ' ');
 
     // Use chess.js to get move history
     const chess = new Chess();
-    chess.load_pgn(pgnText, { sloppy: true });
-    const history = chess.history({ verbose: true });
+    if (!chess.load_pgn(pgnText, { sloppy: true })) {
+        console.error('Invalid PGN');
+        return '';
+    }
 
-    let html = '';
-    let moveNumber = 1;
-    let cursor = 0; // Track character index in cleanPGN
+    const history = chess.history({ verbose: true });
 
     // Build moves on a single line
     let movesLine = '';
+    let moveNumber = 1;
+    let html = '';
+    let annotationIndex = 0;
 
     for (let i = 0; i < history.length; i += 2) {
-        let moveStr = `${moveNumber}. ${history[i].san}`;
-        if (history[i + 1]) moveStr += ` ${history[i + 1].san}`;
-        movesLine += moveStr + ' ';
+        let line = `${moveNumber}. ${history[i].san}`;
+        if (history[i + 1]) line += ` ${history[i + 1].san}`;
+        movesLine += line + ' ';
 
-        // Check for annotations belonging to this move
-        annotations.forEach(a => {
-            if (a.index >= cursor && a.index < cursor + moveStr.length) {
-                html += `<p>${movesLine.trim()}</p>`; // add moves line
-                html += `<p>${a.text}</p>`;           // annotation right after
-                movesLine = ''; // reset moves line after placing it with annotation
-            }
-        });
+        // Add the moves line first
+        html += `<p>${movesLine.trim()}</p>`;
+        movesLine = ''; // reset
 
-        cursor += moveStr.length + 1; // update cursor for next move
+        // Add annotation(s) for this move if available
+        if (annotationIndex < annotations.length) {
+            html += `<p>{${annotations[annotationIndex]}}</p>`;
+            annotationIndex++;
+        }
+
         moveNumber++;
     }
-
-    // Add any remaining moves that have no annotations
-    if (movesLine.trim()) html += `<p>${movesLine.trim()}</p>`;
 
     return html;
 }
