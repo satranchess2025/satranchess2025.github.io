@@ -1,4 +1,10 @@
-# :construction: WIP :construction: Athena Jekyll Theme
+---
+layout: post
+title:  "Athena theme"
+date:   2025-11-10
+---
+
+# Athena Jekyll Theme
 
 A simple and elegant theme for Jekyll and GitHub Pages.
 
