@@ -1,3 +1,9 @@
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/1.0.0/chess.min.js"></script>
+
+<link rel="pgn" href="game.pgn">
+<div id="pgn-output"></div>
+
+<script>
 async function loadPGN() {
   const link = document.querySelector('link[rel="pgn"]');
   if (!link || !link.href) return null;
@@ -32,13 +38,16 @@ async function renderPGN() {
                      .map(tag => `${tag}: ${tags[tag]}`)
                      .join(', ');
 
-  // 2. Render moves only (no header lines)
+  // 2. Render moves with move numbers
   const movesArray = chess.history(); // array of SAN moves
-  const movesText = movesArray.join(' '); // join into single string
+  let movesText = '';
+  for (let i = 0; i < movesArray.length; i += 2) {
+    const moveNumber = Math.floor(i / 2) + 1;
+    const whiteMove = movesArray[i];
+    const blackMove = movesArray[i + 1] ? ' ' + movesArray[i + 1] : '';
+    movesText += `${moveNumber}. ${whiteMove}${blackMove} `;
+  }
+  movesText = movesText.trim();
 
   // Output into two paragraphs
-  const container = document.getElementById('pgn-output');
-  container.innerHTML = `<p>${headInfo}</p><p>${movesText}</p>`;
-}
-
-document.addEventListener('DOMContentLoaded', renderPGN);
+  const co
