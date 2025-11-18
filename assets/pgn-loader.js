@@ -1,4 +1,5 @@
 // PGN loader + parser + renderer using chess.js with annotations preserved and correct move order
+// Engine/clock tags [%eval ...] [%clk ...] are removed
 
 async function loadPGN() {
     const link = document.querySelector('link[rel="pgn"]');
@@ -15,8 +16,11 @@ async function loadPGN() {
 }
 
 async function renderPGN() {
-    const pgnText = await loadPGN();
+    let pgnText = await loadPGN();
     if (!pgnText) return;
+
+    // Remove engine/clock tags
+    pgnText = pgnText.replace(/\[%.*?\]/g, '');
 
     const chess = new Chess();
     if (!chess.load_pgn(pgnText)) {
@@ -38,7 +42,7 @@ async function renderPGN() {
     let match;
     let moveIndex = 0;
     while ((match = moveAnnotationRegex.exec(pgnText)) !== null) {
-        if (match[2]) annotationMap[moveIndex] = match[2].trim();
+        if (match[2] && /[A-Za-z]/.test(match[2])) annotationMap[moveIndex] = match[2].trim();
         moveIndex++;
     }
 
