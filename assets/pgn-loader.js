@@ -36,8 +36,8 @@ function parsePGN(pgnText) {
   moveText = moveText.replace(/\{\s*\}/g, '');
   moveText = moveText.replace(/(\d+\.\s*\S+)\s+\1\.\.\.\s*(\S+)/g, '$1 $2');
 
-  // Split moves and annotations into separate items for <p>
-  const parts = moveText.split(/(?=\{)/g); // split before each annotation
+  // Split moves and annotations by braces but keep the braces attached to annotations
+  const parts = moveText.split(/(?=\{)/g).map(p => p.trim()).filter(p => p.length > 0);
 
   return { tags, moveParts: parts };
 }
@@ -65,10 +65,10 @@ function renderPGN(parsed) {
   let html = `<div>${headerLine}</div>`;
   if (eventLine) html += `<div>${eventLine}</div>`;
 
-  // Wrap each move/annotation in <p> instead of <pre>
-  parsed.moveParts.forEach(part => {
-    html += `<p>${part.trim()}</p>`;
-  });
+  // Wrap moves/annotations in <p>
+  if (parsed.moveParts.length > 0) {
+    html += `<p>${parsed.moveParts.join(' ')}</p>`;
+  }
 
   container.innerHTML = html;
 }
