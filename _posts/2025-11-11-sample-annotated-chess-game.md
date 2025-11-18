@@ -31,16 +31,4 @@ A rather typical queenless middlegame position from Alapin Sicilian. Both sides 
 
 The first instructive moment of the game for me as 11... Nbd7 looked more normal to play. Black immediately starts moving their pawn majority by playing f6 and e5 thus avoid simplifications.
 
-12\. O-O f6 13. Nef3 Rd8 14. c4 Nc7 15. Be3 e5 16. Nc2 Bf5 17. Rac1 Nba6!
-
-<img src="https://lichess1.org/export/fen.gif?fen=r2qnrk1%2Fpb1nbppp%2F1p2p3%2F3pP3%2F3P4%2F5NP1%2FPPQN1PBP%2FR1B2RK1+w+-+-+0+12" />
-
-Another important manuvre to get to d3-square.
-
-18\. a3 Nc5 19. Bxc5 Bxc5
-
-<img src="https://lichess1.org/export/fen.gif?fen=r2qnrk1%2Fpb1nbppp%2F1p2p3%2F3pP3%2F3P4%2F5NP1%2FPPQN1PBP%2FR1B2RK1+w+-+-+0+12" />
-
-Black gets the bishop pair.
-
- [...]
+[...]
