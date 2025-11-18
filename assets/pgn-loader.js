@@ -12,7 +12,7 @@ async function loadPGN() {
   }
 }
 
-async function renderMoves() {
+async function renderPGN() {
   const pgnText = await loadPGN();
   if (!pgnText) return;
 
@@ -24,15 +24,23 @@ async function renderMoves() {
     return;
   }
 
-  // Get moves as a simple SAN string
+  // 1. PGN head info
+  const tags = chess.header(); // get PGN tags
+  const allowedTags = ['Event','Date','White','Black','WhiteElo','BlackElo','WhiteTitle','BlackTitle'];
+  const headInfo = allowedTags
+                     .filter(tag => tags[tag])
+                     .map(tag => `${tag}: ${tags[tag]}`)
+                     .join(', ');
+
+  // 2. Moves text
   const moves = chess.pgn()
-                     .replace(/\[%.*?\]/g, '') // remove [%eval] or [%clk]
-                     .replace(/\s+/g, ' ')     // normalize spaces
+                     .replace(/\[%.*?\]/g, '') // remove [%eval], [%clk], etc.
+                     .replace(/\s+/g, ' ')
                      .trim();
 
-  // Output moves
-  const container = document.getElementById('moves-output');
-  container.textContent = moves;
+  // Render into two paragraphs
+  const container = document.getElementById('pgn-output');
+  container.innerHTML = `<p>${headInfo}</p><p>${moves}</p>`;
 }
 
-document.addEventListener('DOMContentLoaded', renderMoves);
+document.addEventListener('DOMContentLoaded', renderPGN);
