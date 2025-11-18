@@ -35,13 +35,14 @@ async function renderPGN() {
     const eventLine = [tags.Event, tags.Date].filter(Boolean).join(', ');
 
     // Parse PGN moves including annotations
-    let movesText = '';
     let movesOnly = pgnText.replace(/^\[.*\]\s*$/gm, '').trim(); // remove headers
-    movesOnly = movesOnly.replace(/\[%.*?\]/g, ''); // remove engine tags like [%eval], [%clk]
+    movesOnly = movesOnly.replace(/\[%.*?\]/g, ''); // remove engine tags
+    movesOnly = movesOnly.replace(/\{\s*\}/g, ''); // remove empty braces
 
-    // Split moves by move numbers
+    // Split by move numbers
     const moveChunks = movesOnly.split(/\s*(\d+\.)\s*/).filter(s => s.trim() !== '');
 
+    let movesText = '';
     for (let i = 0; i < moveChunks.length; i += 2) {
         const moveNumber = moveChunks[i].replace('.', '');
         const moves = moveChunks[i + 1] ? moveChunks[i + 1].trim() : '';
