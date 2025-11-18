@@ -73,7 +73,7 @@ async function renderPGN() {
     movesText += ` ${tags.Result || '*'}`;
 
     const container = document.getElementById('pgn-output');
-    container.innerHTML = `<p>${headerLine}<br>${eventLine}</p><p>${movesText}</p>`;
+    container.innerHTML = `<p>${headerLine}</p><p>${eventLine}</p><p>${movesText}</p>`;
 }
 
 document.addEventListener('DOMContentLoaded', renderPGN);
