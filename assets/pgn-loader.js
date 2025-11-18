@@ -1,5 +1,5 @@
-// PGN loader + parser + renderer (selected headers only)
-// Loads a PGN file via <link rel="pgn" href="game.pgn"> and renders only specific headers + moves.
+// PGN loader + parser + renderer (custom header format)
+// Loads a PGN file via <link rel="pgn" href="game.pgn"> and renders only selected headers + moves.
 
 async function loadPGN() {
   const link = document.querySelector('link[rel="pgn"]');
@@ -39,20 +39,29 @@ function renderPGN(parsed) {
   const container = document.getElementById('pgn-output');
   if (!container) return;
 
-  // Only display selected headers
-  const allowed = new Set([
-    'Event', 'Date', 'White', 'Black',
-    'WhiteElo', 'BlackElo', 'WhiteTitle', 'BlackTitle'
-  ]);
+  const t = parsed.tags;
 
-  let html = '';
-  for (const key of allowed) {
-    if (parsed.tags[key]) {
-      html += `<div><strong>${key}:</strong> ${parsed.tags[key]}</div>`;
-    }
-  }
+  // Construct custom header line
+  let headerLine = '';
+  if (t.WhiteTitle) headerLine += t.WhiteTitle + ' ';
+  if (t.White) headerLine += t.White + ' ';
+  if (t.WhiteElo) headerLine += `(${t.WhiteElo}) `;
+  headerLine += '- '; // separator
+  if (t.BlackTitle) headerLine += t.BlackTitle + ' ';
+  if (t.Black) headerLine += t.Black + ' ';
+  if (t.BlackElo) headerLine += `(${t.BlackElo})`;
 
+  // Construct event/date line
+  let eventLine = '';
+  if (t.Event) eventLine += t.Event;
+  if (t.Date) eventLine += eventLine ? `, ${t.Date}` : t.Date;
+
+  let html = `<div>${headerLine}</div>`;
+  if (eventLine) html += `<div>${eventLine}</div>`;
+
+  // Display moves below
   html += `<pre>${parsed.moveText}</pre>`;
+
   container.innerHTML = html;
 }
 
