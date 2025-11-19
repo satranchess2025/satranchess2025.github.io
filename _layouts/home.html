@@ -21,7 +21,7 @@
           </ul>
         </div>
 
-        <div class="container mx-auto px-2 mt-4 mb-2 clearfix header-text full-bleed">
+        <div class="container mx-auto px-2 mt-4 mb-2 clearfix header-text">
           <h1 class="h0 inline-block py-2 mt-4 header-title">{{ site.title }}</h1>
 
           <div class="clearfix mb-4 py-1">
@@ -31,13 +31,10 @@
           </div>
 
           <style>
-            .full-bleed::before {
-              content: " ";
-              position: absolute;
+            body {
+              background-image: url(https://www.satranchess.com/images/banner.jpg);
               width: 100vw;
               height: auto;
-              z-index: -1;
-              background-image: url(https://www.satranchess.com/images/banner.jpg);
             }
           </style>
 
