@@ -17,3 +17,12 @@ Replace "[FEN]" with a valid FEN and the result will be a diagram:
 ![image](https://lichess1.org/export/fen.gif?fen=rnbqkb1r%2Fpp3ppp%2F4pn2%2F2p5%2F3P4%2FN1P2N2%2FPP3PPP%2FR1BQKB1R+w+KQkq+-+2+7)
 
 All diagrams are automatically sized to 350px in all pages.
+
+If you want a post to feature a diagram as a thumbnail, type the FEN in the post front matter as shown below:
+
+```
+---
+...
+FEN: ...
+---
+```
