@@ -32,3 +32,12 @@ img[src*="fen.gif"] {
   width: 350px !important;
   height: auto;
 }
+
+pgn { display: none; }
+.gameContainer { margin-bottom: 40px; }
+.gameHeader { font-weight: bold; margin-bottom: 10px; white-space: pre; }
+.controls button { margin-right:6px; margin-bottom: 10px; }
+.moves .move { cursor: grab; margin-right:4px; }
+.moves .move:active { cursor: grabbing; }
+.moves .active { background: yellow; }
+.comment { color: #555; font-style: italic; margin-left:2px; margin-right:4px; }
