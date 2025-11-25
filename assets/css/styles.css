@@ -2,3 +2,8 @@ img[src*="fen.gif"] {
   width: 350px !important;
   height: auto;
 }
+
+.chessboard, .chessboard * {
+  box-sizing: border-box !important;
+  width: 350px !important;
+}
