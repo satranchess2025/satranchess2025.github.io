@@ -1,4 +1,5 @@
 // Safer full-page figurine converter: updates ONLY text nodes, never HTML tags
+// Skips <pgn> tags entirely
 
 const FIGURINES = {
   'K': '\u2654',
@@ -29,11 +30,15 @@ function processTextContent(text) {
 }
 
 function walkAndReplace(node) {
+  // Walk all text nodes
   const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT, null, false);
   const textNodes = [];
 
   while (walker.nextNode()) {
-    textNodes.push(walker.currentNode);
+    // Skip text nodes that are inside <pgn> tags
+    if (!walker.currentNode.parentNode.closest('pgn')) {
+      textNodes.push(walker.currentNode);
+    }
   }
 
   textNodes.forEach(textNode => {
