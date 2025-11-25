@@ -6,6 +6,7 @@ categories: writing
 FEN: rnbqkb1r%2Fpp3ppp%2F4pn2%2F2p5%2F3P4%2FN1P2N2%2FPP3PPP%2FR1BQKB1R+w+KQkq+-+2+7
 ---
 
+{% raw %}
 <pgn>
 [Event "Demo"]
 [Site "Reykjavik"]
@@ -21,4 +22,5 @@ FEN: rnbqkb1r%2Fpp3ppp%2F4pn2%2F2p5%2F3P4%2FN1P2N2%2FPP3PPP%2FR1BQKB1R+w+KQkq+-+
 1. e4 {Good opening move} e5 {Standard reply} 2. Nf3 {Develops knight, attacks e5} Nc6
 3. Bb5 {Ruy Lopez} a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 d6
 </pgn>
+{% endraw %}
 
