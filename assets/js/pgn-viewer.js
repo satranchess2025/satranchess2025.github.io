@@ -7,18 +7,17 @@ console.log("----END----");
 // Requires: chess.js + chessboard.js
 
 document.addEventListener("DOMContentLoaded", () => {
+  // Loop through all PGN source scripts
   document.querySelectorAll('.pgn-source').forEach((scriptTag, index) => {
 
-    // --- Extract raw PGN ---
+    // --- DEBUG: log the raw PGN received by browser ---
     const rawPGN = scriptTag.textContent || "";
-
-    // --- Debug what the browser actually received ---
     console.log("RAW PGN RECEIVED BY BROWSER #" + index);
     console.log("----START----");
     console.log(rawPGN);
     console.log("----END----");
 
-    // --- Sanitize PGN (critical for Jekyll/Markdown issues) ---
+    // --- Sanitize PGN ---
     let pgn = rawPGN.trim()
       .replace(/&lt;/g, "<")
       .replace(/&gt;/g, ">")
@@ -74,28 +73,16 @@ document.addEventListener("DOMContentLoaded", () => {
     for (let i = 0; i < history.length; i++) {
       const move = history[i];
 
-      // Start White's move
       if (move.color === "w") {
         html += `<div class="move-pair">`;
         html += `<span class="move-num">${moveNumber}. </span>`;
         html += `<a href="#" class="mv" data-index="${i}">${move.san}</a> `;
-
-        // Insert comment after white move if it exists
-        if (move.comment) {
-          html += `<span class="comment"> ${move.comment}</span> `;
-        }
-
+        if (move.comment) html += `<span class="comment"> ${move.comment}</span> `;
       } else {
-        // Black move
         html += `<span class="black-move">`;
         html += `<span class="black-num">${moveNumber}... </span>`;
         html += `<a href="#" class="mv" data-index="${i}">${move.san}</a> `;
-
-        // Insert comment after black move
-        if (move.comment) {
-          html += `<span class="comment"> ${move.comment}</span> `;
-        }
-
+        if (move.comment) html += `<span class="comment"> ${move.comment}</span> `;
         html += `</span></div>`;
         moveNumber++;
       }
@@ -113,16 +100,12 @@ document.addEventListener("DOMContentLoaded", () => {
       a.addEventListener("click", evt => {
         evt.preventDefault();
         const idx = parseInt(a.dataset.index, 10);
-
         const replay = new Chess();
         const hist = chess.history({ verbose: true });
-
-        for (let j = 0; j <= idx; j++) {
-          replay.move(hist[j]);
-        }
-
+        for (let j = 0; j <= idx; j++) replay.move(hist[j]);
         board.position(replay.fen());
       });
     });
-  });
+
+  }); // end forEach
 });
