@@ -6,8 +6,7 @@
         const DEFAULT_CONFIG = {
             draggable: false, 
             orientation: 'white',
-            // Using the Alpha set for pieces
-            pieceTheme: 'https://chessboardjs.com/img/chesspieces/alpha/{piece}.png'
+            pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
         };
 
         // 2. Main parsing and rendering function
