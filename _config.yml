@@ -14,7 +14,7 @@
 # You can create any custom variable you would like, and they will be accessible
 # in the templates via {{ site.myvariable }}.
 title: Rookpawn
-description: A theme for chess blogging with figurine notation, FEN diagrams, and a built-in simple PGN viewer. Forked from [Athena](https://broccolini.net/athena/), a simple and elegant theme for [Jekyll](https://jekyllrb.com/) and [GitHub Pages](https://pages.github.com/). Requires [chess.js](https://jhlywa.github.io/chess.js/) and [chessboard.js](https://chessboardjs.com/).
+description: A theme for chess blogging with figurine notation, FEN diagrams, and a built-in simple PGN viewer. Forked from <a href="https://broccolini.net/athena/">Athena</a>, a simple and elegant theme for [Jekyll](https://jekyllrb.com/) and [GitHub Pages](https://pages.github.com/). Requires [chess.js](https://jhlywa.github.io/chess.js/) and [chessboard.js](https://chessboardjs.com/).
 # baseurl: "/athena" # the subpath of your site, e.g. /blog
 url: "https://satranchess2025.github.io" # the base hostname & protocol for your site
 # github_repo: athena # the GitHub repo name for your project
