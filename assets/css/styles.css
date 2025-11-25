@@ -1,33 +1,3 @@
-.boardwrapper {
-  display: inline-block;
-  margin-left: auto;
-  margin-right: auto;
-  width: 350px;
-}
-
-#board-buttons {
-  margin-top: 5px;
-  margin-bottom: 10px;
-  overflow: auto;
-  text-align: center;
-}
-
-#board-buttons button {
-  display: inline-block;
-  float: none;
-  margin-right: 4px;
-}
-
-.highlight {
-  background-color: #F3F315;
-}
-
-.gameMoves a {
-  color: inherit;
-  text-decoration: none;
-  cursor: pointer;
-}
-
 img[src*="fen.gif"] {
   width: 350px !important;
   height: auto;
