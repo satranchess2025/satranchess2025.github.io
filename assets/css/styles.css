@@ -10,7 +10,10 @@ img[src*="fen.gif"] {
 #myBoard *::after,
 #board *,
 #board *::before,
-#board *::after {
+#board *::after,
+.board *,
+.board *::before,
+.board *::after {
   box-sizing: content-box !important; 
 }
 
