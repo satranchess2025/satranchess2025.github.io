@@ -1,4 +1,24 @@
-var board = null;
+    (function() {
+        const pgnElements = document.getElementsByTagName('pgn');
+        
+        for (let i = 0; i < pgnElements.length; i++) {
+            const pgnEl = pgnElements[i];
+            // FIX: Trim the content to remove extraneous leading/trailing whitespace/newlines 
+            // that interfere with parsing.
+            let pgnContent = pgnEl.innerHTML.trim(); 
+            
+            // 1. Create the <script type="text/pgn"> element
+            const scriptTag = document.createElement('script');
+            scriptTag.setAttribute('type', 'text/pgn');
+            scriptTag.setAttribute('id', 'game-pgn'); 
+            scriptTag.innerHTML = pgnContent;
+            
+            // 2. Append the new <script> tag, keeping the original PGN content inside the <pgn> tag.
+            pgnEl.appendChild(scriptTag);
+        }
+    })();
+ 
+        var board = null;
         var game = null;
         var moveHistory = []; 
         var currentMove = -1;
@@ -11,6 +31,11 @@ var board = null;
         }
 
         function displayPosition() {
+            // Guard clause to prevent errors if the board hasn't been initialized yet.
+            if (!board) {
+                return;
+            }
+            
             if (currentMove < 0) {
                 board.position('start');
             } else if (currentMove < moveHistory.length) {
@@ -18,7 +43,6 @@ var board = null;
             }
 
             // Update button states
-            // FIX: Only disable when currentMove is -1 (start position), not 0 (after first move).
             $('#startBtn').prop('disabled', currentMove < 0);
             $('#prevBtn').prop('disabled', currentMove < 0);
             
@@ -63,10 +87,14 @@ var board = null;
                 return;
             }
 
+            // This now reads from the script tag created by the wrapper script above
             let pgnString = $('#game-pgn').html();
             
             if (pgnString) {
                 pgnString = pgnString.trim();
+                // Aggressively clean up potential invisible or non-standard characters
+                pgnString = pgnString.replace(/[\u200B-\u200D\uFEFF]/g, '');
+                pgnString = pgnString.replace(/[\u2654-\u265F]/g, '');
             }
 
             if (!pgnString) {
@@ -79,11 +107,11 @@ var board = null;
                 
                 if (!game.load_pgn(pgnString, { sloppy: true })) {
                     console.error("Error: PGN parsing failed.", pgnString);
-                    return;
+                    return; 
                 }
             } catch (e) {
                 console.error("Error initializing chess.js or loading PGN:", e);
-                return;
+                return; 
             }
             
             // 1. Get all moves with verbose information
@@ -113,6 +141,7 @@ var board = null;
                 }
 
                 // Create the clickable link for the half-move
+                // Added return false to the onclick to prevent default link action
                 pgnHtml += `<a href="#" id="move-link-${i}" onclick="jumpToMove(${i}); return false;">${move.san}</a> `;
             }
             $('#pgnDisplay').html(pgnHtml);
@@ -125,5 +154,6 @@ var board = null;
             };
             board = Chessboard('board', boardConfig);
 
+            // 5. Set initial display state
             toStart();
         });
