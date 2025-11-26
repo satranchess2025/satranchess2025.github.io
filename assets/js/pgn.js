@@ -67,25 +67,23 @@ $(document).ready(function() {
         return;
     }
 
-    // --- PGN Wrapper Logic REMOVED ---
-    // The previous wrapper logic created a timing/reading issue.
-    // We now read directly from the original <pgn id="pgn-source"> element.
-
-    // Get the PGN content directly from the <pgn> tag.
-    // Using .html() or .text() on the custom element should work, but we use .html() 
-    // to capture the raw text content as intended.
-    let pgnString = $('#pgn-source').html();
+    // FIX: Use native DOM methods for maximum reliability when reading content 
+    // from custom HTML tags like <pgn>.
+    const pgnEl = document.getElementById('pgn-source');
+    let pgnString = '';
     
-    if (pgnString) {
-        pgnString = pgnString.trim();
+    if (pgnEl) {
+        // Use textContent for reliable retrieval of raw text from a custom tag.
+        pgnString = (pgnEl.textContent || '').trim(); 
+        
         // Aggressively clean up potential invisible or non-standard characters
         pgnString = pgnString.replace(/[\u200B-\u200D\uFEFF]/g, '');
         pgnString = pgnString.replace(/[\u2654-\u265F]/g, '');
     }
-
+    
     if (!pgnString) {
-        // Now checks if the actual <pgn> tag content is empty.
-        console.error('Error: No PGN found in the <pgn> source tag.');
+        // Updated error message to include a helpful hint
+        console.error('Error: No PGN found in the <pgn> source tag. Please check that the <pgn id="pgn-source"> element contains valid PGN data.');
         return;
     }
 
