@@ -86,8 +86,11 @@ $(document).ready(function() {
     // --- End PGN Wrapper Logic ---
 
 
-    // Read PGN from the dynamically created script tag using .text() for reliable content extraction
-    let pgnString = $('#game-pgn').text();
+    // FIX: Read PGN from the dynamically created script tag using native DOM methods 
+    // (textContent) for reliable content extraction, as jQuery methods can be inconsistent 
+    // with hidden, non-standard elements.
+    const gamePgnScript = document.getElementById('game-pgn');
+    let pgnString = gamePgnScript ? (gamePgnScript.textContent || gamePgnScript.innerText || '') : '';
     
     if (pgnString) {
         pgnString = pgnString.trim();
