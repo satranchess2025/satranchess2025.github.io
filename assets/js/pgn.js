@@ -67,30 +67,14 @@ $(document).ready(function() {
         return;
     }
 
-    // --- PGN Wrapper Logic (Executed first) ---
-    // 1. Find the custom <pgn> tag
-    const pgnEl = document.getElementById('pgn-source');
-    if (pgnEl) {
-        // 2. Trim the content to remove extraneous leading/trailing whitespace/newlines
-        let pgnContent = pgnEl.innerHTML.trim(); 
-        
-        // 3. Create the <script type="text/pgn"> element with ID 'game-pgn'
-        const scriptTag = document.createElement('script');
-        scriptTag.setAttribute('type', 'text/pgn');
-        scriptTag.setAttribute('id', 'game-pgn'); 
-        scriptTag.innerHTML = pgnContent;
-        
-        // 4. Append the new <script> tag to the <pgn> element
-        pgnEl.appendChild(scriptTag);
-    }
-    // --- End PGN Wrapper Logic ---
+    // --- PGN Wrapper Logic REMOVED ---
+    // The previous wrapper logic created a timing/reading issue.
+    // We now read directly from the original <pgn id="pgn-source"> element.
 
-
-    // FIX: Read PGN from the dynamically created script tag using native DOM methods 
-    // (textContent) for reliable content extraction, as jQuery methods can be inconsistent 
-    // with hidden, non-standard elements.
-    const gamePgnScript = document.getElementById('game-pgn');
-    let pgnString = gamePgnScript ? (gamePgnScript.textContent || gamePgnScript.innerText || '') : '';
+    // Get the PGN content directly from the <pgn> tag.
+    // Using .html() or .text() on the custom element should work, but we use .html() 
+    // to capture the raw text content as intended.
+    let pgnString = $('#pgn-source').html();
     
     if (pgnString) {
         pgnString = pgnString.trim();
@@ -100,8 +84,8 @@ $(document).ready(function() {
     }
 
     if (!pgnString) {
-        // This error will now only occur if the <pgn> tag was empty or missing.
-        console.error('Error: No PGN found in the script tag.');
+        // Now checks if the actual <pgn> tag content is empty.
+        console.error('Error: No PGN found in the <pgn> source tag.');
         return;
     }
 
