@@ -294,4 +294,79 @@
   }
 
   // ---- Insert comments, variations, diagrams --------------------
-  function insertEventBlock(wrapper, ev, index, plyIndex, ga
+  function insertEventBlock(wrapper, ev, index, plyIndex, game) {
+
+    // ----- DIAGRAM BLOCK -----
+    if (ev.type === "diagram") {
+      // Rebuild position up to plyIndex
+      var temp = new Chess();
+      var hist = temp.history({ verbose: true });
+      temp.reset();
+
+      for (var i = 0; i < plyIndex; i++) {
+        temp.move(hist[i]);
+      }
+
+      var id = "pgn-diagram-" + index + "-" + plyIndex + "-" + Math.random().toString(36).substr(2, 8);
+      var div = document.createElement("div");
+      div.className = "pgn-diagram";
+      div.id = id;
+      wrapper.appendChild(div);
+
+      // create board
+      Chessboard(id, {
+        position: temp.fen(),
+        draggable: false,
+        pieceTheme: PIECE_THEME_URL
+      });
+
+      return;
+    }
+
+    // ----- COMMENTS / VARIATIONS -----
+    var p = document.createElement("p");
+    p.className = (ev.type === "comment" ? "pgn-comment" : "pgn-variation");
+
+    // indent comments like variations
+    var depth = ev.depth;
+    if (!depth) {
+      depth = findNearestVariationDepth(ev, wrapper);
+    }
+    if (depth > 0) {
+      p.style.marginLeft = (depth * 1.5) + "rem";
+    }
+
+    p.textContent = normalizeResult(ev.text);
+    wrapper.appendChild(p);
+  }
+
+  // Find nearest previous variation depth
+  function findNearestVariationDepth(ev, wrapper) {
+    // Simplest approach: check event list backwards is easier,
+    // but we don't have global list here, so depth stays 0 for comments
+    // unless ev.depth was set (which variation sets).
+    return ev.depth || 0;
+  }
+
+  // --------------------------------------------------------
+  function renderAll(root) {
+    var nodes = (root || document).querySelectorAll("pgn");
+    for (var i = 0; i < nodes.length; i++) {
+      renderPGNElement(nodes[i], i);
+    }
+  }
+
+  function init() {
+    renderAll(document);
+    window.PGNRenderer = {
+      run: function (root) {
+        renderAll(root || document.body);
+      }
+    };
+  }
+
+  if (document.readyState === "loading")
+    document.addEventListener("DOMContentLoaded", init);
+  else init();
+
+})();
