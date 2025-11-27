@@ -29,7 +29,7 @@
                 draggable: false,
                 pieceTheme: PIECE_THEME_URL,
 
-                // ⭐ Smooth animation
+                // Smooth animated movement
                 moveSpeed: 200,
                 snapSpeed: 20,
                 snapbackSpeed: 20,
@@ -38,10 +38,18 @@
         },
 
         loadMoves(history) {
-            this.moves = history;
+            this.moves = history || [];
         },
 
         showPosition(plyIndex) {
+            // Allow -1 for "start position"
+            if (plyIndex < 0) {
+                this.currentPly = -1;
+                this.board.position("start", true);
+                this.highlightMove(-1);
+                return;
+            }
+
             this.currentPly = plyIndex;
 
             var temp = new Chess();
@@ -49,7 +57,7 @@
                 temp.move(this.moves[i]);
             }
 
-            // ⭐ animate = true
+            // animate = true
             this.board.position(temp.fen(), true);
 
             this.highlightMove(plyIndex);
@@ -58,8 +66,25 @@
         highlightMove(plyIndex) {
             this.moveSpans.forEach(s => s.classList.remove("sticky-move-active"));
 
-            var span = this.moveSpans.find(s => parseInt(s.dataset.ply, 10) === plyIndex);
-            if (span) span.classList.add("sticky-move-active");
+            var span = this.moveSpans.find(
+                s => parseInt(s.dataset.ply, 10) === plyIndex
+            );
+
+            if (!span) return;
+
+            span.classList.add("sticky-move-active");
+
+            // Always scroll the active move into view
+            this.scrollMoveIntoView(span);
+        },
+
+        scrollMoveIntoView(moveSpan) {
+            // Simple, robust: always smooth scroll, center vertically
+            moveSpan.scrollIntoView({
+                behavior: "smooth",
+                block: "center",
+                inline: "nearest"
+            });
         },
 
         gotoNext() {
@@ -69,8 +94,11 @@
         },
 
         gotoPrev() {
-            if (this.currentPly - 1 >= -1) {
+            if (this.currentPly - 1 >= 0) {
                 this.showPosition(this.currentPly - 1);
+            } else {
+                // Go back to the initial position (before any move)
+                this.showPosition(-1);
             }
         },
 
@@ -81,11 +109,11 @@
 
             blocks.forEach(block => {
 
-                // ⭐ Read real history exported from pgn.js
-                if (block._pgnHistory) {
+                // Real PGN history from pgn.js
+                if (block._pgnHistory && Array.isArray(block._pgnHistory)) {
                     StickyBoard.loadMoves(block._pgnHistory);
                 } else {
-                    console.warn("stickyboard.js: no _pgnHistory found");
+                    console.warn("stickyboard.js: no _pgnHistory found on block");
                     return;
                 }
 
@@ -95,12 +123,13 @@
                 var spans = block.querySelectorAll("span");
 
                 spans.forEach(span => {
-                    var text = span.textContent
+                    // Strip move number prefix like "8."
+                    var textSansNumber = span.textContent
                         .replace(/^\d+\.+/, "")
                         .trim();
 
                     var isSAN =
-                        /(O-O|O-O-O|[KQRBN♔♕♖♗♘]?[a-h]?[1-8]?x?[a-h][1-8](=[QRBN])?[+#]?)/.test(text);
+                        /(O-O|O-O-O|[KQRBN♔♕♖♗♘]?[a-h]?[1-8]?x?[a-h][1-8](=[QRBN])?[+#]?)/.test(textSansNumber);
 
                     var isMoveNumber = /^\d+\./.test(span.textContent.trim());
 
@@ -113,23 +142,30 @@
                             this.moveSpans.push(span);
                             plyCounter++;
                         } else {
+                            // Move number itself uses current plyCounter
                             span.dataset.ply = plyCounter;
                         }
 
                         span.addEventListener("click", () => {
                             var p = parseInt(span.dataset.ply, 10);
-                            StickyBoard.showPosition(p);
+                            this.showPosition(p);
                         });
                     }
                 });
             });
 
-            // ⭐ Keyboard navigation
+            // Keyboard navigation
             window.addEventListener("keydown", (e) => {
+                // Avoid interfering with text inputs / textareas
+                var tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : "";
+                if (tag === "input" || tag === "textarea") return;
+
                 if (e.key === "ArrowRight") {
+                    e.preventDefault();
                     this.gotoNext();
                 }
                 if (e.key === "ArrowLeft") {
+                    e.preventDefault();
                     this.gotoPrev();
                 }
             });
@@ -153,6 +189,7 @@
     border-radius: 4px;
 }
 
+/* No link-like styling */
 .sticky-move:hover {
     text-decoration: none !important;
 }
@@ -166,7 +203,7 @@
     document.head.appendChild(style);
 
 
-    // ===== Start after PGNRenderer =====
+    // ===== Initialize after PGNRenderer =====
     document.addEventListener("DOMContentLoaded", () => {
         if (window.PGNRenderer && window.PGNRenderer.run) {
             StickyBoard.activate(document);
