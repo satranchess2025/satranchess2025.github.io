@@ -47,7 +47,6 @@
     var div = document.createElement("div");
     div.className = "pgn-diagram";
     div.id = id;
-    // Block diagram; simple width, no extra styling
     div.style.width = "340px";
     div.style.maxWidth = "100%";
     wrapper.appendChild(div);
@@ -69,7 +68,6 @@
     );
   }
 
-  // Ensure the current context has a paragraph container
   function ensureParagraph(ctx, wrapper, className) {
     if (!ctx.container) {
       var p = document.createElement("p");
@@ -79,28 +77,20 @@
     }
   }
 
-  // Create a clickable move span, add move number if needed, and advance Chess
-  function handleSANToken(displayToken, ctx, wrapper) {
-    var core = displayToken.replace(/[!?+#]+$/g, ""); // strip trailing ! ? + #
+  function handleSANToken(displayToken, ctx) {
+    var core = displayToken.replace(/[!?+#]+$/g, "");
     if (!isSANCore(core)) return null;
 
-    // determine move number and side *before* playing move
-    var ply = ctx.chess.history().length; // 0-based half-move count
-    var isWhiteToMove = (ply % 2 === 0);
+    var ply = ctx.chess.history().length;
+    var isWhite = (ply % 2 === 0);
     var moveNumber = Math.floor(ply / 2) + 1;
 
-    // white: always show move number
-    if (isWhiteToMove) {
-      appendText(
-        ctx.container,
-        moveNumber + ". "
-      );
+    if (isWhite) {
+      appendText(ctx.container, moveNumber + ". ");
       ctx.lastWasInterrupt = false;
     } else {
-      // black: show number only if interrupted, or first black move in mainline
       var printBlack = false;
 
-      // first black move in main game: ply === 1 and ctx.type === "main"
       if (ctx.type === "main" && ply === 1) {
         printBlack = true;
       } else if (ctx.lastWasInterrupt) {
@@ -108,10 +98,7 @@
       }
 
       if (printBlack) {
-        appendText(
-          ctx.container,
-          moveNumber + "... "
-        );
+        appendText(ctx.container, moveNumber + "... ");
       }
 
       ctx.lastWasInterrupt = false;
@@ -119,7 +106,6 @@
 
     var mv = ctx.chess.move(core, { sloppy: true });
     if (!mv) {
-      // fallback: if illegal, just print token as text (no span)
       appendText(ctx.container, displayToken + " ");
       return null;
     }
@@ -129,10 +115,10 @@
     span.dataset.fen = ctx.chess.fen();
     span.textContent = displayToken + " ";
     ctx.container.appendChild(span);
+
     return span;
   }
 
-  // Parse a comment {...}, render as its own <p>, and mark interruption
   function parseComment(movetext, pos, outerCtx, wrapper) {
     var commentChess = new Chess(outerCtx.chess.fen());
     var p = document.createElement("p");
@@ -140,7 +126,6 @@
     wrapper.appendChild(p);
 
     var n = movetext.length;
-
     while (pos < n) {
       var ch = movetext[pos];
 
@@ -166,15 +151,12 @@
 
       if (token === "[D]") {
         createDiagram(wrapper, commentChess.fen());
-        // new comment paragraph after diagram if more text follows
         p = document.createElement("p");
         p.className = "pgn-comment";
         wrapper.appendChild(p);
         continue;
       }
 
-      // SAN moves inside comments: we keep them clickable but
-      // do NOT bother with numbering rules here (keep comments light).
       (function () {
         var core = token.replace(/[!?+#]+$/g, "");
         if (!isSANCore(core)) {
@@ -194,13 +176,10 @@
       })();
     }
 
-    // comments count as interruption for the outer context
     outerCtx.lastWasInterrupt = true;
     return pos;
   }
 
-  // Build paragraphs in true reading order.
-  // Mainline, variations, comments and diagrams are emitted as they are read.
   function buildMovetextDOM(movetext, wrapper) {
     var mainChess = new Chess();
 
@@ -219,24 +198,16 @@
     while (i < n) {
       var ch = movetext[i];
 
-      // whitespace → single space in current paragraph
       if (/\s/.test(ch)) {
         while (i < n && /\s/.test(movetext[i])) i++;
-        ensureParagraph(
-          ctx,
-          wrapper,
-          ctx.type === "main" ? "pgn-mainline" : "pgn-variation"
-        );
+        ensureParagraph(ctx, wrapper, ctx.type === "main" ? "pgn-mainline" : "pgn-variation");
         appendText(ctx.container, " ");
         continue;
       }
 
-      // start variation
       if (ch === "(") {
         i++;
-
-        // entering a variation interrupts the parent stream
-        if (ctx) ctx.lastWasInterrupt = true;
+        ctx.lastWasInterrupt = true;
 
         var varChess = new Chess(ctx.chess.fen());
         var varCtx = {
@@ -247,34 +218,26 @@
           lastWasInterrupt: false
         };
         ctx = varCtx;
-        // new paragraph for variation
         ensureParagraph(ctx, wrapper, "pgn-variation");
         continue;
       }
 
-      // end variation
       if (ch === ")") {
         i++;
         if (ctx.parent) {
-          var parent = ctx.parent;
-          ctx = parent;
-          // returning from variation interrupts the parent stream
+          ctx = ctx.parent;
           ctx.lastWasInterrupt = true;
-          // subsequent text continues in a new paragraph in parent
           ctx.container = null;
         }
         continue;
       }
 
-      // comment
       if (ch === "{") {
         i = parseComment(movetext, i + 1, ctx, wrapper);
-        // after comment, continue same context in a NEW paragraph
         ctx.container = null;
         continue;
       }
 
-      // normal token
       var start = i;
       while (i < n) {
         var c2 = movetext[i];
@@ -284,44 +247,35 @@
       var token = movetext.substring(start, i);
       if (!token) continue;
 
-      // diagram marker
       if (token === "[D]") {
         createDiagram(wrapper, ctx.chess.fen());
-        // diagram interrupts the stream
         ctx.lastWasInterrupt = true;
-        // subsequent tokens in same context go to a new paragraph
         ctx.container = null;
         continue;
       }
 
-      // result / move number literals → plain text, do not cause interruption
-      if (
-        /^(1-0|0-1|1\/2-1\/2|½-½|\*)$/.test(token) ||
-        /^\d+\.+$/.test(token)
-      ) {
-        ensureParagraph(
-          ctx,
-          wrapper,
-          ctx.type === "main" ? "pgn-mainline" : "pgn-variation"
-        );
+      // keep results (½-½, etc.)
+      if (/^(1-0|0-1|1\/2-1\/2|½-½|\*)$/.test(token)) {
+        ensureParagraph(ctx, wrapper, ctx.type === "main" ? "pgn-mainline" : "pgn-variation");
         appendText(ctx.container, token + " ");
         continue;
       }
 
+      // IGNORE PGN move-number tokens like "1.", "23.", etc.
+      if (/^\d+\.+$/.test(token)) {
+        continue;
+      }
+
       // SAN move?
-      ensureParagraph(
-        ctx,
-        wrapper,
-        ctx.type === "main" ? "pgn-mainline" : "pgn-variation"
-      );
-      var sanSpan = handleSANToken(token, ctx, wrapper);
+      ensureParagraph(ctx, wrapper, ctx.type === "main" ? "pgn-mainline" : "pgn-variation");
+      var sanSpan = handleSANToken(token, ctx);
       if (!sanSpan) {
         appendText(ctx.container, token + " ");
       }
     }
   }
 
-  function renderPGNElement(el, index) {
+  function renderPGNElement(el) {
     if (!ensureDeps()) return;
 
     var raw = el.textContent.trim();
@@ -373,8 +327,6 @@
     h3.innerHTML = white + " – " + black + "<br>" + eventLine;
     wrapper.appendChild(h3);
 
-    // Build paragraphs + diagrams in correct reading order,
-    // including final result token if present.
     buildMovetextDOM(movetext + (result ? " " + result : ""), wrapper);
 
     el.replaceWith(wrapper);
@@ -385,11 +337,9 @@
   }
 
   function renderAll(root) {
-    (root || document)
-      .querySelectorAll("pgn")
-      .forEach(function (el, i) {
-        renderPGNElement(el, i);
-      });
+    (root || document).querySelectorAll("pgn").forEach(function (el) {
+      renderPGNElement(el);
+    });
   }
 
   function init() {
