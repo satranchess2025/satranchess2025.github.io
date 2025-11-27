@@ -17,14 +17,6 @@
     <script src="{{ "/assets/js/figurine.js" | prepend: full_base_url }}"></script>
     <script src="{{ "/assets/js/fen.js" | prepend: full_base_url }}"></script>
     <script src="{{ "/assets/js/pgn.js" | prepend: full_base_url }}"></script>
-
-    <script>
-    document.addEventListener("DOMContentLoaded", () => {
-      if (window.ChessFigurine) ChessFigurine.run();
-      if (window.FENRenderer) FENRenderer.run();
-      if (window.PGNRenderer) PGNRenderer.run();
-    });
-    </script>
   </body>
 
 </html>
