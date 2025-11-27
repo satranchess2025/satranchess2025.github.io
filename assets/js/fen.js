@@ -4,7 +4,7 @@
   "use strict";
 
   // Set your remote piece theme here:
-  const PIECE_THEME_URL = "https://lichess1.org/assets/_CGjL2q/piece/{piece}.svg";
+  const PIECE_THEME_URL = "https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.svg";
   // You may replace this with any other theme URL that contains "{piece}"
 
   function renderFENElement(el, index) {
