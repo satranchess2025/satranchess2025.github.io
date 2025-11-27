@@ -74,7 +74,6 @@
             this.initBoard();
             this.collectMoves(root);
 
-            // Click handling
             this.moveSpans.forEach((span, idx) => {
                 span.style.cursor = "pointer";
                 span.addEventListener("click", () => {
@@ -82,7 +81,6 @@
                 });
             });
 
-            // Keyboard navigation
             window.addEventListener("keydown", e => {
                 var tag = (e.target.tagName || "").toLowerCase();
                 if (tag === "input" || tag === "textarea") return;
@@ -99,7 +97,6 @@
         }
     };
 
-    // CSS
     var style = document.createElement("style");
     style.textContent = `
 #sticky-chessboard {

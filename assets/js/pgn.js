@@ -37,7 +37,7 @@
 
   var diagramCounter = 0;
 
-  function createDiagram(wrapper, fen, small) {
+  function createDiagram(wrapper, fen) {
     if (typeof Chessboard === "undefined") {
       console.warn("pgn.js: chessboard.js missing for diagrams");
       return;
@@ -45,12 +45,11 @@
 
     var id = "pgn-diagram-" + (diagramCounter++);
     var div = document.createElement("div");
-    div.className = "pgn-diagram" + (small ? " pgn-diagram-small" : "");
+    div.className = "pgn-diagram";
     div.id = id;
-    div.style.width = small ? "250px" : "340px";
+    // width only, no extra styling
+    div.style.width = "340px";
     div.style.maxWidth = "100%";
-    div.style.margin = "0.75rem 0";
-
     wrapper.appendChild(div);
 
     setTimeout(function () {
@@ -64,20 +63,19 @@
     }, 0);
   }
 
-  // Simple SAN core tester
   function isSANCore(tok) {
-    return /^(O-O(-O)?[+#]?|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](=[QRBN])?[+#]?|[a-h][1-8](=[QRBN])?[+#]?)$/.test(tok);
+    return /^(O-O(-O)?[+#]?|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](=[QRBN])?[+#]?|[a-h][1-8](=[QRBN])?[+#]?)$/.test(
+      tok
+    );
   }
 
-  // Process one SAN-ish token in given Chess context
+  // Creates a clickable move span and advances the given Chess context
   function handleSANToken(displayToken, ctx) {
     var core = displayToken.replace(/[!?+#]+$/g, ""); // strip NAG-ish suffix
     if (!isSANCore(core)) return null;
 
     var mv = ctx.chess.move(core, { sloppy: true });
-    if (!mv) {
-      return null;
-    }
+    if (!mv) return null;
 
     var span = document.createElement("span");
     span.className = "pgn-move sticky-move";
@@ -87,71 +85,70 @@
     return span;
   }
 
-  // Parse {...} comment, with its own temp Chess (doesn't affect mainline)
-  function parseComment(text, pos, outerCtx, wrapper) {
+  // Parse a comment {...} starting at movetext[pos] == first char inside {,
+  // using a separate Chess object but starting from outerCtx.chess.fen().
+  function parseComment(movetext, pos, outerCtx, wrapper) {
     var commentChess = new Chess(outerCtx.chess.fen());
     var p = document.createElement("p");
     p.className = "pgn-comment";
-    p.style.marginLeft = (outerCtx.depth + 1) * 1.5 + "rem";
-    p.style.fontSize = "0.8rem";
     wrapper.appendChild(p);
 
-    var n = text.length;
+    var n = movetext.length;
 
     while (pos < n) {
-      var ch = text[pos];
+      var ch = movetext[pos];
 
       if (ch === "}") {
         pos++;
         break;
       }
 
-      // whitespace
       if (/\s/.test(ch)) {
-        while (pos < n && /\s/.test(text[pos])) pos++;
+        while (pos < n && /\s/.test(movetext[pos])) pos++;
         appendText(p, " ");
         continue;
       }
 
-      // token until whitespace or '}'
       var start = pos;
       while (pos < n) {
-        var c2 = text[pos];
+        var c2 = movetext[pos];
         if (/\s/.test(c2) || c2 === "}") break;
         pos++;
       }
-      var token = text.substring(start, pos);
+      var token = movetext.substring(start, pos);
+
+      if (!token) continue;
 
       if (token === "[D]") {
-        var small = (outerCtx.depth > 0); // comment inside variation -> small
-        createDiagram(wrapper, commentChess.fen(), small);
+        createDiagram(wrapper, commentChess.fen());
         continue;
       }
 
-      // Try SAN move inside comment
-      var sanSpan = (function () {
+      // Try SAN inside comment
+      (function () {
         var core = token.replace(/[!?+#]+$/g, "");
-        if (!isSANCore(core)) return null;
+        if (!isSANCore(core)) {
+          appendText(p, token + " ");
+          return;
+        }
         var mv = commentChess.move(core, { sloppy: true });
-        if (!mv) return null;
-
+        if (!mv) {
+          appendText(p, token + " ");
+          return;
+        }
         var span = document.createElement("span");
         span.className = "pgn-move sticky-move";
         span.dataset.fen = commentChess.fen();
         span.textContent = token + " ";
         p.appendChild(span);
-        return span;
       })();
-
-      if (!sanSpan) {
-        appendText(p, token + " ");
-      }
     }
 
     return pos;
   }
 
-  // Build mainline + variations + comments with structural paragraphs
+  // Build paragraphs in reading order: mainline, variations, comments & diagrams.
+  // No indentation / no special font-styling.
   function buildMovetextDOM(movetext, wrapper) {
     var mainChess = new Chess();
 
@@ -161,7 +158,6 @@
 
     var rootCtx = {
       chess: mainChess,
-      depth: 0,
       container: mainP,
       parent: null
     };
@@ -173,7 +169,7 @@
     while (i < n) {
       var ch = movetext[i];
 
-      // whitespace -> collapse to single space
+      // whitespace → single space
       if (/\s/.test(ch)) {
         while (i < n && /\s/.test(movetext[i])) i++;
         appendText(ctx.container, " ");
@@ -186,13 +182,10 @@
         var varChess = new Chess(ctx.chess.fen());
         var pVar = document.createElement("p");
         pVar.className = "pgn-variation";
-        pVar.style.marginLeft = (ctx.depth + 1) * 1.5 + "rem";
-        pVar.style.fontSize = "0.8rem";
         wrapper.appendChild(pVar);
 
         ctx = {
           chess: varChess,
-          depth: ctx.depth + 1,
           container: pVar,
           parent: ctx
         };
@@ -216,23 +209,24 @@
       var start = i;
       while (i < n) {
         var c2 = movetext[i];
-        if (/\s/.test(c2) || c2 === "(" || c2 === ")" || c2 === "{" || c2 === "}") break;
+        if (/\s/.test(c2) || c2 === "(" || c2 === ")" || c2 === "{" || c2 === "}")
+          break;
         i++;
       }
       var token = movetext.substring(start, i);
-
       if (!token) continue;
 
       // Diagram marker in mainline / variation
       if (token === "[D]") {
-        // In mainline or variation but not comment: big diagram
-        createDiagram(wrapper, ctx.chess.fen(), false);
+        createDiagram(wrapper, ctx.chess.fen());
         continue;
       }
 
-      // Result marker or move number -> just text
-      if (/^(1-0|0-1|1\/2-1\/2|½-½|\*)$/.test(token) ||
-          /^\d+\.+$/.test(token)) {
+      // Result or move number → plain text
+      if (
+        /^(1-0|0-1|1\/2-1\/2|½-½|\*)$/.test(token) ||
+        /^\d+\.+$/.test(token)
+      ) {
         appendText(ctx.container, token + " ");
         continue;
       }
@@ -245,7 +239,6 @@
     }
   }
 
-  // Render a single <pgn> element
   function renderPGNElement(el, index) {
     if (!ensureDeps()) return;
 
@@ -298,7 +291,7 @@
     h3.innerHTML = white + " – " + black + "<br>" + eventLine;
     wrapper.appendChild(h3);
 
-    // Build move paragraphs + diagrams
+    // Build paragraphs + diagrams in correct order
     buildMovetextDOM(movetext + (result ? " " + result : ""), wrapper);
 
     el.replaceWith(wrapper);
