@@ -23,7 +23,7 @@
     return /^\d{4}$/.test(p[0]) ? p[0] : "";
   }
 
-  // ---- Format NAG symbols ---------------------------------------
+  // ---- NAG formatting ----------------------------------------------------
   function formatNAGs(sanText) {
     sanText = sanText.replace(/!!/, '<span class="nag nag-brilliant">!!</span>');
     sanText = sanText.replace(/\?\?/, '<span class="nag nag-blunder">??</span>');
@@ -34,7 +34,7 @@
     return sanText;
   }
 
-  // ---- Flip "Surname, Firstname" → "Firstname Surname" ----------
+  // ---- Flip "Surname, Firstname" → "Firstname Surname" ------------------
   function flipName(name) {
     if (!name) return "";
     var idx = name.indexOf(",");
@@ -42,7 +42,7 @@
     return name.substring(idx + 1).trim() + " " + name.substring(0, idx).trim();
   }
 
-  // ---- Parse movetext, detect comments/variations/diagrams -------
+  // ---- Parse movetext, detect comments/variations/diagrams --------------
   function parseMovetext(movetext) {
     var events = [];
     var sanitizedParts = [];
@@ -60,9 +60,8 @@
         while (i < n && movetext.charAt(i) !== "}") i++;
         var raw = movetext.substring(start, i).trim();
 
-        // Comment containing [D]
         if (raw.indexOf("[D]") !== -1) {
-          var isSmall = (varDepth > 0); // small only if inside variation
+          var isSmall = (varDepth > 0);
 
           events.push({
             type: "diagram",
@@ -112,7 +111,6 @@
 
         // CASE A: comment inside variation containing [D]
         if (/\{[^}]*\[D\][^}]*\}/.test(inner)) {
-          // innerBeforeComment {commentWithD} innerAfterComment
           var commentRegex = /\{([^}]*)\}/;
           var cm = inner.match(commentRegex);
           var innerBefore = "";
@@ -123,16 +121,14 @@
             rawComment = cm[1].trim();
             var commentFull = cm[0];
             var commentIndex = inner.indexOf(commentFull);
-            innerBefore = inner.substring(0, commentIndex).trim(); // e.g. "8. Na3"
-            innerAfter = inner.substring(commentIndex + commentFull.length).trim(); // e.g. "Rg8 9. Nb1..."
+            innerBefore = inner.substring(0, commentIndex).trim();
+            innerAfter = inner.substring(commentIndex + commentFull.length).trim();
           }
 
-          // Split comment around [D]
           var parts = rawComment.split("[D]");
-          var commentBefore = (parts[0] || "").trim();  // "de düşünülebilemezdi."
-          var commentAfter  = (parts[1] || "").trim();  // "Sonracığma şunlar olurdu:"
+          var commentBefore = (parts[0] || "").trim();
+          var commentAfter  = (parts[1] || "").trim();
 
-          // HEAD paragraph: first move + commentBefore
           events.push({
             type: "variation_head",
             plyIndex: currentPly,
@@ -141,7 +137,6 @@
             headComment: commentBefore
           });
 
-          // Diagram: small (comment inside variation)
           events.push({
             type: "diagram",
             plyIndex: currentPly,
@@ -149,8 +144,6 @@
             small: true
           });
 
-          // TAIL paragraph: commentAfter + full variation moves with numbering restarted
-          // Variation root moves string = innerBefore + " " + innerAfter
           var allMoves = (innerBefore ? innerBefore + " " : "") +
                          (innerAfter || "");
           allMoves = allMoves.trim();
@@ -163,16 +156,16 @@
             allMoves: allMoves
           });
 
-        // CASE B: direct variation-level [D] like "([D])"
+        // CASE B: direct variation-level [D]
         } else if (/^\[D\]$/.test(inner)) {
           events.push({
             type: "diagram",
             plyIndex: currentPly,
             depth: varDepth,
-            small: false   // full-size diagram for pure variation [D]
+            small: false
           });
 
-        // CASE C: normal variation with no [D] in comments
+        // CASE C: normal variation
         } else if (/(O-O|O-O-O|[KQRBN]|^\d+\.)/.test(inner)) {
           events.push({
             type: "variation",
@@ -203,7 +196,6 @@
       var tok = movetext.substring(startTok, i);
       sanitizedParts.push(tok + " ");
 
-      // SAN detection → increment ply
       if (/^\d+\.+$/.test(tok)) continue;
       if (/^\$\d+$/.test(tok)) continue;
       if (/^(1-0|0-1|1\/2-1\/2|½-½|\*)$/.test(tok)) continue;
@@ -220,7 +212,7 @@
     return { sanitized: sanitized, events: events };
   }
 
-  // ---- MAIN RENDERER -------------------------------------------
+  // ---- MAIN RENDERER ----------------------------------------------------
   function renderPGNElement(el, index) {
     if (!ensureDeps()) return;
 
@@ -286,7 +278,6 @@
     wrapper.appendChild(currentP);
     var lastMoveSpan = null;
 
-    // Events before move 1
     while (eventIdx < events.length && events[eventIdx].plyIndex === 0) {
       insertEventBlock(wrapper, events[eventIdx], index, currentPly, game);
       eventIdx++;
@@ -337,14 +328,14 @@
     }
   }
 
-  // ---- EVENT INSERTION -----------------------------------------
+  // ---- EVENT INSERTION --------------------------------------------------
   function insertEventBlock(wrapper, ev, index, plyIndex, game) {
 
-    // ---- DIAGRAM EVENT ----
+    // ---- DIAGRAM --------------------------------------------------------
     if (ev.type === "diagram") {
+
       var temp = new Chess();
       var fullHistory = game.history({ verbose: true });
-
       for (var k = 0; k < plyIndex && k < fullHistory.length; k++) {
         temp.move(fullHistory[k]);
       }
@@ -361,10 +352,12 @@
       div.className = "pgn-diagram";
       div.id = id;
 
-      if (ev.small) {
-        div.style.width = "250px";
-      } else {
-        div.style.width = "340px";
+      if (ev.small) div.style.width = "250px";
+      else div.style.width = "340px";
+
+      // ⭐ NEW: indentation for diagrams inside variations
+      if (ev.depth > 0) {
+        div.style.marginLeft = (ev.depth * 1.5) + "rem";
       }
 
       wrapper.appendChild(div);
@@ -383,10 +376,13 @@
       return;
     }
 
-    // ---- COMMENT / VARIATION / VARIATION_HEAD / VARIATION_TAIL ----
+    // ---- COMMENT / VARIATION / variation_head / variation_tail ----
     var p = document.createElement("p");
     var isComment = (ev.type === "comment");
     p.className = isComment ? "pgn-comment" : "pgn-variation";
+
+    // ⭐ NEW: smaller font
+    p.style.fontSize = "0.8rem";
 
     var depth = ev.depth || 0;
     if (depth > 0) {
@@ -397,18 +393,19 @@
 
     if (ev.type === "comment") {
       text = ev.text || "";
+
     } else if (ev.type === "variation") {
       text = ev.text || "";
+
     } else if (ev.type === "variation_head") {
-      // "8. Na3 de düşünülebilemezdi."
       var s1 = ev.headMoves || "";
       if (ev.headComment) {
         if (s1) s1 += " ";
         s1 += ev.headComment;
       }
       text = s1;
+
     } else if (ev.type === "variation_tail") {
-      // "Sonracığma şunlar olurdu: 8. Na3 Rg8 9. Nb1 ..."
       var s2 = ev.tailComment || "";
       if (ev.allMoves) {
         if (s2) s2 += " ";
@@ -421,7 +418,7 @@
     wrapper.appendChild(p);
   }
 
-  // ---- Initialization ----------
+  // ---- Initialization ---------------------------------------------------
   function renderAll(root) {
     var nodes = (root || document).querySelectorAll("pgn");
     for (var i = 0; i < nodes.length; i++) {
