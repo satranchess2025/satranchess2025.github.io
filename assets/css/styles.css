@@ -1,17 +1,12 @@
-.diagram {margin: 2rem 0;}
-
-img[src*="fen.gif"] {
-  width: 400px !important;
-  height: auto;
-}
-
-.fen-board {
+.fen-board,
+.pgn-board {
   width: 400px;
   max-width: 100%;
+  margin: 2rem 0;
 }
 
 #board,
-.pgn-board 
+.pgn-board,
 .board {width: 400px;}
 .board-wrapper {max-width: 400px !important;}
 
