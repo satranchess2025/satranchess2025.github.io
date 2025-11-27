@@ -17,7 +17,7 @@
     return true;
   }
 
-  // Board initialization queue
+  // Queue diagrams, initialize after DOM injection
   var pendingBoards = [];
 
   function queueBoard(id, fen) {
@@ -76,26 +76,27 @@
     var moves = game.history({ verbose: true });
     game.reset();
 
-    // Create wrapper
+    // Outer wrapper
     var wrapper = document.createElement("div");
     wrapper.className = "pgn-blog-block";
 
-    // Headings
+    // H2
     var h2 = document.createElement("h2");
     h2.textContent = white + " – " + black;
     wrapper.appendChild(h2);
 
+    // H3
     var h3 = document.createElement("h3");
     h3.textContent = year ? eventName + ", " + year : eventName;
     wrapper.appendChild(h3);
 
-    // Determine halfway point in move list
+    // Determine halfway move index
     var half = Math.floor(moves.length / 2);
 
-    // First paragraph: moves BEFORE the mid-diagram
+    // ------------------------------------
+    // MOVES BEFORE DIAGRAM
+    // ------------------------------------
     var p1 = document.createElement("p");
-
-    game.reset();
 
     for (var i = 0; i < moves.length; i++) {
       var m = moves[i];
@@ -109,23 +110,21 @@
 
       p1.appendChild(span);
 
-      // Stop just BEFORE the halfway move’s position
       if (i === half - 1) break;
-
-      game.move(m.san);
     }
 
     wrapper.appendChild(p1);
 
-    // ---------------------------
-    // Insert the diagram NOW
-    // ---------------------------
+    // ------------------------------------
+    // DIAGRAM AT HALFWAY POSITION
+    // ------------------------------------
     game.reset();
     for (var x = 0; x < half; x++) {
       game.move(moves[x].san);
     }
 
     var midFen = game.fen();
+
     var midId = "pgn-middle-" + index;
     var midDiv = document.createElement("div");
     midDiv.id = midId;
@@ -134,9 +133,9 @@
 
     queueBoard(midId, midFen);
 
-    // ---------------------------
-    // Moves AFTER the diagram
-    // ---------------------------
+    // ------------------------------------
+    // MOVES AFTER DIAGRAM
+    // ------------------------------------
     var p2 = document.createElement("p");
 
     for (var j = half; j < moves.length; j++) {
@@ -151,13 +150,13 @@
 
     wrapper.appendChild(p2);
 
-    // Replace <pgn> with rendered content
+    // Replace original <pgn> with rendered block
     el.replaceWith(wrapper);
 
-    // Initialize all boards
+    // Initialize all queued boards
     initAllBoards();
 
-    // Apply figurines on rendered moves
+    // Apply figurine notation after rendering
     if (window.ChessFigurine && window.ChessFigurine.run) {
       ChessFigurine.run(wrapper);
     }
