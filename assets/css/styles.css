@@ -22,8 +22,6 @@ img[src*="fen.gif"] {
 .board-wrapper {max-width: 400px !important;}
 .board-wrapper * {box-sizing: content-box !important;}
 
-fen {display: none;}
-
 /* assets/css/chess.css 
 
 .fen-board,
