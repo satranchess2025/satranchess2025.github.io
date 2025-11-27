@@ -35,9 +35,12 @@
 
         showPosition(plyIndex) {
             var temp = new Chess();
-            for (var i = 0; i < plyIndex && i < this.moves.length; i++) {
+
+            // ⭐ FIXED: apply moves up to and INCLUDING plyIndex
+            for (var i = 0; i <= plyIndex && i < this.moves.length; i++) {
                 temp.move(this.moves[i]);
             }
+
             this.board.position(temp.fen());
         },
 
@@ -48,7 +51,7 @@
 
             blocks.forEach(block => {
 
-                // ⭐ Load real move list exported from pgn.js
+                // ⭐ Load real move list from pgn.js
                 if (block._pgnHistory) {
                     StickyBoard.loadMoves(block._pgnHistory);
                 } else {
@@ -61,8 +64,10 @@
                 var spans = block.querySelectorAll("span");
 
                 spans.forEach(span => {
+
+                    // Remove move numbers before SAN parsing
                     var text = span.textContent
-                        .replace(/^\d+\.+/, "") // remove move numbers
+                        .replace(/^\d+\.+/, "")
                         .trim();
 
                     var isSAN =
@@ -91,7 +96,7 @@
         }
     };
 
-    // CSS
+    // ===== CSS =====
     var style = document.createElement("style");
     style.textContent = `
 #sticky-chessboard {
@@ -112,10 +117,12 @@
 `;
     document.head.appendChild(style);
 
+    // ===== Initialize AFTER PGNRenderer =====
     document.addEventListener("DOMContentLoaded", () => {
         if (window.PGNRenderer && window.PGNRenderer.run) {
             StickyBoard.activate(document);
         } else {
+            // Retry in case pgn.js loads slow
             setTimeout(() => StickyBoard.activate(document), 300);
         }
     });
