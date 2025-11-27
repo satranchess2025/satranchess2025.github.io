@@ -2,32 +2,31 @@
 (function () {
   "use strict";
 
+  var PIECE_THEME_URL =
+    "https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png";
+
   function ensureDeps() {
-    if (typeof Chess === "undefined") {
-      console.warn("pgn.js: chess.js missing");
+    if (typeof Chess === "undefined" || typeof Chessboard === "undefined") {
+      console.warn("pgn.js: chess.js or chessboard.js missing");
       return false;
     }
     return true;
   }
 
-  // Convert 1/2-1/2 -> ½-½ for display
+  // Convert 1/2-1/2 -> ½-½
   function normalizeResult(str) {
     if (!str) return "";
     return str.replace(/1\/2-1\/2/g, "½-½");
   }
 
-  // Extract year safely
   function extractYear(dateStr) {
     if (!dateStr) return "";
-    var parts = dateStr.split(".");
-    if (!parts.length) return "";
-    var y = parts[0];
-    return /^\d{4}$/.test(y) ? y : "";
+    var p = dateStr.split(".");
+    return /^\d{4}$/.test(p[0]) ? p[0] : "";
   }
 
-  // --- NAG FORMATTING: ! ? !! ?? !? ?! --------------------------
+  // ---- NAG formatting (!, ?, !!, ??, !?, ?!) --------------------
   function formatNAGs(sanText) {
-    // Longest first to avoid partial matches
     sanText = sanText.replace(/!!/, '<span class="nag nag-brilliant">!!</span>');
     sanText = sanText.replace(/\?\?/, '<span class="nag nag-blunder">??</span>');
     sanText = sanText.replace(/!\?/, '<span class="nag nag-interesting">!?</span>');
@@ -37,8 +36,18 @@
     return sanText;
   }
 
-  // --- Parse movetext and build event list ----------------------
-  // events: { type, text, plyIndex, depth }
+  // Small helper: flip "Surname, Firstname" -> "Firstname Surname"
+  function flipName(name) {
+    if (!name) return "";
+    var idx = name.indexOf(",");
+    if (idx === -1) return name.trim();
+    var last = name.substring(0, idx).trim();
+    var first = name.substring(idx + 1).trim();
+    return first + " " + last;
+  }
+
+  // Event types: comment, variation, diagram
+  // We detect {[D]} and ([D]) inside comments/variations.
   function parseMovetext(movetext) {
     var events = [];
     var sanitizedParts = [];
@@ -50,46 +59,59 @@
     while (i < n) {
       var ch = movetext.charAt(i);
 
-      // COMMENT { ... }
+      // -------- COMMENT { ... } -----------
       if (ch === "{") {
         i++;
         var start = i;
         while (i < n && movetext.charAt(i) !== "}") i++;
-        var comment = movetext.substring(start, i).trim();
-        if (comment.length) {
+        var raw = movetext.substring(start, i).trim();
+
+        // Detect diagram marker {[D]}
+        if (raw === "[D]") {
+          events.push({
+            type: "diagram",
+            plyIndex: currentPly,
+            depth: varDepth
+          });
+        } else {
           events.push({
             type: "comment",
-            text: comment,
+            text: raw,
             plyIndex: currentPly,
-            depth: 0 // depth fixed below via inheritance
+            depth: 0
           });
         }
+
         if (i < n && movetext.charAt(i) === "}") i++;
         continue;
       }
 
-      // VARIATION ( ... )
+      // -------- VARIATION ( ... ) ----------
       if (ch === "(") {
         varDepth++;
         i++;
         var innerStart = i;
-        var depthNow = 1;
+        var depth = 1;
 
-        while (i < n && depthNow > 0) {
+        while (i < n && depth > 0) {
           var c2 = movetext.charAt(i);
-          if (c2 === "(") depthNow++;
-          else if (c2 === ")") depthNow--;
+          if (c2 === "(") depth++;
+          else if (c2 === ")") depth--;
           i++;
         }
-
         var innerEnd = i - 1;
-        var varText = movetext.substring(innerStart, innerEnd).trim();
+        var inner = movetext.substring(innerStart, innerEnd).trim();
 
-        // Must contain a SAN-like token to count as variation
-        if (/(O-O|O-O-O|[KQRBN][a-h1-8]|[a-h][1-8]|^\d+\.)/.test(varText)) {
+        if (inner === "[D]") {
+          events.push({
+            type: "diagram",
+            plyIndex: currentPly,
+            depth: varDepth
+          });
+        } else if (/(O-O|O-O-O|[KQRBN][a-h1-8]|[a-h][1-8]|^\d+\.)/.test(inner)) {
           events.push({
             type: "variation",
-            text: varText,
+            text: inner,
             plyIndex: currentPly,
             depth: varDepth
           });
@@ -117,63 +139,55 @@
       sanitizedParts.push(tok + " ");
 
       // Detect SAN move
-      if (/^\d+\.+$/.test(tok)) continue; // move number
-      if (/^\$\d+$/.test(tok)) continue;  // NAG
-      if (/^(1-0|0-1|1\/2-1\/2|½-½|\*)$/.test(tok)) continue; // result
+      if (/^\d+\.+$/.test(tok)) continue;
+      if (/^\$\d+$/.test(tok)) continue;
+      if (/^(1-0|0-1|1\/2-1\/2|½-½|\*)$/.test(tok)) continue;
 
       if (
-        /^(O-O(-O)?[+#]?|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](=[QRBN])?[+#]?|[a-h][1-8](=[QRBN])?[+#]?)$/.test(
-          tok
-        )
+        /^(O-O(-O)?[+#]?|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](=[QRBN])?[+#]?|[a-h][1-8](=[QRBN])?[+#]?)$/.test(tok)
       ) {
         currentPly++;
       }
     }
 
     var sanitized = sanitizedParts.join(" ").replace(/\s+/g, " ").trim();
-
-    return {
-      sanitized: sanitized,
-      events: events
-    };
+    return { sanitized: sanitized, events: events };
   }
 
-  // --- MAIN RENDER FUNCTION -------------------------------------
+  // ---- MAIN RENDER -------------------------------------------------
   function renderPGNElement(el, index) {
     if (!ensureDeps()) return;
 
     var raw = el.textContent.trim();
 
-    // Split headers & movetext
+    // ----- Split header vs movetext -----
     var lines = raw.split(/\r?\n/);
     var headerLines = [];
     var movetextLines = [];
     var inHeader = true;
 
     for (var li = 0; li < lines.length; li++) {
-      var line = lines[li];
-      var t = line.trim();
+      var t = lines[li].trim();
 
       if (inHeader && t.startsWith("[") && t.indexOf("]") !== -1) {
-        headerLines.push(line);
+        headerLines.push(lines[li]);
       } else if (inHeader && t === "") {
         inHeader = false;
       } else {
         inHeader = false;
-        movetextLines.push(line);
+        movetextLines.push(lines[li]);
       }
     }
 
     var movetext = movetextLines.join(" ").replace(/\s+/g, " ").trim();
 
-    // Parse movetext for events + sanitized version
+    // ---- Parse movetext ----
     var parsed = parseMovetext(movetext);
     var sanitizedMovetext = parsed.sanitized;
     var events = parsed.events;
 
-    // Build PGN for chess.js
     var cleanedPGN =
-      (headerLines.length > 0 ? headerLines.join("\n") + "\n\n" : "") +
+      (headerLines.length ? headerLines.join("\n") + "\n\n" : "") +
       sanitizedMovetext;
 
     var game = new Chess();
@@ -186,22 +200,24 @@
     var result = normalizeResult(headers.Result || "");
     var moves = game.history({ verbose: true });
 
-    // Player lines
+    // ---- Names / Event line ----
+    var whiteName = flipName(headers.White || "");
+    var blackName = flipName(headers.Black || "");
+
     var white =
-      (headers.WhiteTitle || "") + " " + (headers.White || "") +
+      (headers.WhiteTitle ? headers.WhiteTitle + " " : "") +
+      whiteName +
       (headers.WhiteElo ? " (" + headers.WhiteElo + ")" : "");
-    white = white.trim();
 
     var black =
-      (headers.BlackTitle || "") + " " + (headers.Black || "") +
+      (headers.BlackTitle ? headers.BlackTitle + " " : "") +
+      blackName +
       (headers.BlackElo ? " (" + headers.BlackElo + ")" : "");
-    black = black.trim();
 
-    var eventName = headers.Event || "";
     var year = extractYear(headers.Date);
-    var eventLine = eventName + (year ? ", " + year : "");
+    var eventLine = (headers.Event || "") + (year ? ", " + year : "");
 
-    // Wrapper
+    // ---- Build wrapper ----
     var wrapper = document.createElement("div");
     wrapper.className = "pgn-blog-block";
 
@@ -214,98 +230,44 @@
     var currentP = null;
     var lastMoveSpan = null;
 
-    // Render events tied to plyIndex 0
+    // ---- Insert any events at plyIndex 0 ----
     while (eventIdx < events.length && events[eventIdx].plyIndex === 0) {
       var e0 = events[eventIdx];
-      var p0 = document.createElement("p");
-      p0.className =
-        e0.type === "comment" ? "pgn-comment" : "pgn-variation";
-
-      // Comments inherit indentation from nearest earlier variation
-      if (e0.depth) {
-        p0.style.marginLeft = (e0.depth * 1.5) + "rem";
-      } else {
-        var inheritedDepth = 0;
-        for (var back = eventIdx - 1; back >= 0; back--) {
-          if (events[back].type === "variation" && events[back].depth) {
-            inheritedDepth = events[back].depth;
-            break;
-          }
-        }
-        if (inheritedDepth > 0) {
-          p0.style.marginLeft = (inheritedDepth * 1.5) + "rem";
-        }
-      }
-
-      p0.textContent = normalizeResult(e0.text);
-      wrapper.appendChild(p0);
+      insertEventBlock(wrapper, e0, index, currentPly, game);
       eventIdx++;
     }
 
-    // Start main move paragraph
+    // ---- Start first move paragraph ----
     currentP = document.createElement("p");
     wrapper.appendChild(currentP);
 
-    // MAIN MOVE LOOP
+    // ---- Iterate moves ----
     for (var mi = 0; mi < moves.length; mi++) {
       var m = moves[mi];
-      var isWhite = (m.color === "w");
       var moveNumber = Math.floor(mi / 2) + 1;
+      var isWhite = (m.color === "w");
 
-      // Format SAN + NAGs
-      var sanStr = formatNAGs(m.san);
-
-      // Determine prefix (fix for black moves after comments/variations)
       var prefix = "";
       if (isWhite) {
         prefix = moveNumber + ". ";
-      } else {
-        if (currentP.textContent.trim() === "") {
-          prefix = moveNumber + "... ";
-        }
+      } else if (currentP.textContent.trim() === "") {
+        prefix = moveNumber + "... ";
       }
 
-      var spanMove = document.createElement("span");
-      spanMove.innerHTML = prefix + sanStr + " ";
-      currentP.appendChild(spanMove);
-      lastMoveSpan = spanMove;
+      var span = document.createElement("span");
+      span.innerHTML = prefix + formatNAGs(m.san) + " ";
+      currentP.appendChild(span);
+      lastMoveSpan = span;
 
       currentPly++;
 
-      // Insert events for this ply
+      // --- Insert events for this ply ---
       while (eventIdx < events.length &&
              events[eventIdx].plyIndex === currentPly) {
 
         var ev = events[eventIdx];
+        insertEventBlock(wrapper, ev, index, currentPly, game);
 
-        var ep = document.createElement("p");
-        ep.className =
-          ev.type === "comment" ? "pgn-comment" : "pgn-variation";
-
-        // --- NEW COMMENT INDENT FIX ---
-        if (ev.type === "variation" && ev.depth) {
-          ep.style.marginLeft = (ev.depth * 1.5) + "rem";
-        } else {
-          // comment: inherit indentation from nearest previous variation
-          var inheritedDepth = ev.depth;
-          if (!inheritedDepth) {
-            inheritedDepth = 0;
-            for (var b = eventIdx - 1; b >= 0; b--) {
-              if (events[b].type === "variation" && events[b].depth) {
-                inheritedDepth = events[b].depth;
-                break;
-              }
-            }
-          }
-          if (inheritedDepth > 0) {
-            ep.style.marginLeft = (inheritedDepth * 1.5) + "rem";
-          }
-        }
-
-        ep.textContent = normalizeResult(ev.text);
-        wrapper.appendChild(ep);
-
-        // Continue moves in a new paragraph
         currentP = document.createElement("p");
         wrapper.appendChild(currentP);
 
@@ -313,46 +275,23 @@
       }
     }
 
-    // Append result to last move
+    // ---- Append result ----
     if (result && lastMoveSpan) {
       lastMoveSpan.innerHTML =
         lastMoveSpan.innerHTML.trim() + " " + result;
     }
 
-    // Remove empty trailing <p>
+    // remove empty trailing <p>
     if (currentP && currentP.textContent.trim() === "") {
       wrapper.removeChild(currentP);
     }
 
-    // Replace original <pgn>
     el.replaceWith(wrapper);
 
-    // Apply figurine conversion
     if (window.ChessFigurine && window.ChessFigurine.run) {
       ChessFigurine.run(wrapper);
     }
   }
 
-  // --------------------------------------------------------------
-  function renderAll(root) {
-    var scope = root || document;
-    var nodes = scope.querySelectorAll("pgn");
-    for (var i = 0; i < nodes.length; i++) {
-      renderPGNElement(nodes[i], i);
-    }
-  }
-
-  function init() {
-    renderAll(document);
-    window.PGNRenderer = {
-      run: function (root) {
-        renderAll(root || document.body);
-      }
-    };
-  }
-
-  if (document.readyState === "loading")
-    document.addEventListener("DOMContentLoaded", init);
-  else init();
-
-})();
+  // ---- Insert comments, variations, diagrams --------------------
+  function insertEventBlock(wrapper, ev, index, plyIndex, ga
