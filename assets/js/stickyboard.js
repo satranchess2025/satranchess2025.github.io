@@ -14,7 +14,7 @@
         board: null,
         moves: [],
         moveSpans: [],
-        currentPly: -1, // -1 = initial position (before moves)
+        currentPly: -1,
 
         initBoard() {
             if (document.getElementById("sticky-chessboard")) return;
@@ -27,7 +27,13 @@
             this.board = Chessboard("sticky-chessboard", {
                 position: "start",
                 draggable: false,
-                pieceTheme: PIECE_THEME_URL
+                pieceTheme: PIECE_THEME_URL,
+
+                // ⭐ Smooth animation
+                moveSpeed: 200,
+                snapSpeed: 20,
+                snapbackSpeed: 20,
+                appearSpeed: 150
             });
         },
 
@@ -35,7 +41,6 @@
             this.moves = history;
         },
 
-        // ⭐ Apply moves up to (and including) plyIndex
         showPosition(plyIndex) {
             this.currentPly = plyIndex;
 
@@ -43,7 +48,9 @@
             for (var i = 0; i <= plyIndex && i < this.moves.length; i++) {
                 temp.move(this.moves[i]);
             }
-            this.board.position(temp.fen());
+
+            // ⭐ animate = true
+            this.board.position(temp.fen(), true);
 
             this.highlightMove(plyIndex);
         },
@@ -74,6 +81,7 @@
 
             blocks.forEach(block => {
 
+                // ⭐ Read real history exported from pgn.js
                 if (block._pgnHistory) {
                     StickyBoard.loadMoves(block._pgnHistory);
                 } else {
@@ -158,6 +166,7 @@
     document.head.appendChild(style);
 
 
+    // ===== Start after PGNRenderer =====
     document.addEventListener("DOMContentLoaded", () => {
         if (window.PGNRenderer && window.PGNRenderer.run) {
             StickyBoard.activate(document);
