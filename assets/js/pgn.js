@@ -23,7 +23,6 @@
     return /^\d{4}$/.test(p[0]) ? p[0] : "";
   }
 
-  // ---- NAG formatting ----------------------------------------------------
   function formatNAGs(sanText) {
     sanText = sanText.replace(/!!/, '<span class="nag nag-brilliant">!!</span>');
     sanText = sanText.replace(/\?\?/, '<span class="nag nag-blunder">??</span>');
@@ -34,7 +33,6 @@
     return sanText;
   }
 
-  // ---- Flip "Surname, Firstname" → "Firstname Surname" ------------------
   function flipName(name) {
     if (!name) return "";
     var idx = name.indexOf(",");
@@ -42,7 +40,6 @@
     return name.substring(idx + 1).trim() + " " + name.substring(0, idx).trim();
   }
 
-  // ---- Parse movetext, detect comments/variations/diagrams --------------
   function parseMovetext(movetext) {
     var events = [];
     var sanitizedParts = [];
@@ -53,7 +50,6 @@
     while (i < n) {
       var ch = movetext.charAt(i);
 
-      // ----- COMMENT { ... } -----
       if (ch === "{") {
         i++;
         var start = i;
@@ -92,7 +88,6 @@
         continue;
       }
 
-      // ----- VARIATION ( ... ) -----
       if (ch === "(") {
         varDepth++;
         i++;
@@ -109,7 +104,6 @@
         var innerEnd = i - 1;
         var inner = movetext.substring(innerStart, innerEnd).trim();
 
-        // CASE A: comment inside variation containing [D]
         if (/\{[^}]*\[D\][^}]*\}/.test(inner)) {
           var commentRegex = /\{([^}]*)\}/;
           var cm = inner.match(commentRegex);
@@ -156,7 +150,6 @@
             allMoves: allMoves
           });
 
-        // CASE B: direct variation-level [D]
         } else if (/^\[D\]$/.test(inner)) {
           events.push({
             type: "diagram",
@@ -165,7 +158,6 @@
             small: false
           });
 
-        // CASE C: normal variation
         } else if (/(O-O|O-O-O|[KQRBN]|^\d+\.)/.test(inner)) {
           events.push({
             type: "variation",
@@ -179,14 +171,12 @@
         continue;
       }
 
-      // ----- Whitespace -----
       if (/\s/.test(ch)) {
         sanitizedParts.push(" ");
         i++;
         continue;
       }
 
-      // ----- Normal token -----
       var startTok = i;
       while (i < n) {
         var c3 = movetext.charAt(i);
@@ -212,7 +202,6 @@
     return { sanitized: sanitized, events: events };
   }
 
-  // ---- MAIN RENDERER ----------------------------------------------------
   function renderPGNElement(el, index) {
     if (!ensureDeps()) return;
 
@@ -234,7 +223,6 @@
     }
 
     var movetext = movetextLines.join(" ").replace(/\s+/g, " ").trim();
-
     var parsed = parseMovetext(movetext);
     var sanitized = parsed.sanitized;
     var events = parsed.events;
@@ -254,6 +242,8 @@
 
     var wrapper = document.createElement("div");
     wrapper.className = "pgn-blog-block";
+
+    wrapper._pgnHistory = moves;   // ⭐ NEW: EXPORT MOVE LIST FOR STICKYBOARD
 
     var white =
       (headers.WhiteTitle ? headers.WhiteTitle + " " : "") +
@@ -283,7 +273,6 @@
       eventIdx++;
     }
 
-    // ---- MOVES LOOP ----
     for (var mi = 0; mi < moves.length; mi++) {
       var m = moves[mi];
       var moveNumber = Math.floor(mi / 2) + 1;
@@ -294,7 +283,10 @@
       else if (currentP.textContent.trim() === "") prefix = moveNumber + "... ";
 
       var span = document.createElement("span");
+      span.classList.add("pgn-move");
+      span.dataset.ply = currentPly;
       span.innerHTML = prefix + formatNAGs(m.san) + " ";
+
       currentP.appendChild(span);
       lastMoveSpan = span;
 
@@ -328,14 +320,12 @@
     }
   }
 
-  // ---- EVENT INSERTION --------------------------------------------------
   function insertEventBlock(wrapper, ev, index, plyIndex, game) {
 
-    // ---- DIAGRAM --------------------------------------------------------
     if (ev.type === "diagram") {
-
       var temp = new Chess();
       var fullHistory = game.history({ verbose: true });
+
       for (var k = 0; k < plyIndex && k < fullHistory.length; k++) {
         temp.move(fullHistory[k]);
       }
@@ -352,10 +342,8 @@
       div.className = "pgn-diagram";
       div.id = id;
 
-      if (ev.small) div.style.width = "250px";
-      else div.style.width = "340px";
+      div.style.width = ev.small ? "250px" : "340px";
 
-      // ⭐ NEW: indentation for diagrams inside variations
       if (ev.depth > 0) {
         div.style.marginLeft = (ev.depth * 1.5) + "rem";
       }
@@ -376,12 +364,9 @@
       return;
     }
 
-    // ---- COMMENT / VARIATION / variation_head / variation_tail ----
     var p = document.createElement("p");
-    var isComment = (ev.type === "comment");
-    p.className = isComment ? "pgn-comment" : "pgn-variation";
+    p.className = (ev.type === "comment" ? "pgn-comment" : "pgn-variation");
 
-    // ⭐ NEW: smaller font
     p.style.fontSize = "0.95rem";
 
     var depth = ev.depth || 0;
@@ -418,7 +403,6 @@
     wrapper.appendChild(p);
   }
 
-  // ---- Initialization ---------------------------------------------------
   function renderAll(root) {
     var nodes = (root || document).querySelectorAll("pgn");
     for (var i = 0; i < nodes.length; i++) {

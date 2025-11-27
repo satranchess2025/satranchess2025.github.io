@@ -19,6 +19,7 @@
 
             var div = document.createElement("div");
             div.id = "sticky-chessboard";
+            div.className = "sticky-chessboard";
             document.body.appendChild(div);
 
             this.board = Chessboard("sticky-chessboard", {
@@ -46,33 +47,37 @@
             var blocks = (root || document).querySelectorAll(".pgn-blog-block");
 
             blocks.forEach(block => {
-                // Load game history
-                var g = new Chess();
-                g.load_pgn(block.innerText.replace(/\n/g, " "), { sloppy: true });
-                this.loadMoves(g.history({ verbose: true }));
+
+                // ⭐ Load real move list exported from pgn.js
+                if (block._pgnHistory) {
+                    StickyBoard.loadMoves(block._pgnHistory);
+                } else {
+                    console.warn("stickyboard.js: no _pgnHistory found in block");
+                    return;
+                }
 
                 var plyCounter = 0;
 
-                // Find all moves
                 var spans = block.querySelectorAll("span");
+
                 spans.forEach(span => {
-                    var txt = span.textContent.trim();
+                    var text = span.textContent
+                        .replace(/^\d+\.+/, "") // remove move numbers
+                        .trim();
 
                     var isSAN =
-                        /(O-O|O-O-O|[KQRBN♔♕♖♗♘]?[a-h]?[1-8]?x?[a-h][1-8](=[QRBN])?[+#]?)/.test(txt);
+                        /(O-O|O-O-O|[KQRBN♔♕♖♗♘]?[a-h]?[1-8]?x?[a-h][1-8](=[QRBN])?[+#]?)/.test(text);
 
-                    var isMoveNumber = /^\d+\./.test(txt);
+                    var isMoveNumber = /^\d+\./.test(span.textContent.trim());
 
                     if (isSAN || isMoveNumber) {
                         span.classList.add("sticky-move");
                         span.style.cursor = "pointer";
 
-                        // Move only increments on SAN
                         if (isSAN) {
                             span.dataset.ply = plyCounter;
                             plyCounter++;
                         } else {
-                            // Move number
                             span.dataset.ply = plyCounter;
                         }
 
@@ -86,7 +91,7 @@
         }
     };
 
-    // Inject CSS
+    // CSS
     var style = document.createElement("style");
     style.textContent = `
 #sticky-chessboard {
@@ -101,19 +106,16 @@
     box-shadow: 0 4px 16px rgba(0,0,0,0.3);
     border-radius: 4px;
 }
-
 .sticky-move:hover {
     text-decoration: underline;
 }
 `;
     document.head.appendChild(style);
 
-    // Wait for PGNRenderer to finish
     document.addEventListener("DOMContentLoaded", () => {
         if (window.PGNRenderer && window.PGNRenderer.run) {
             StickyBoard.activate(document);
         } else {
-            // Retry after PGNRenderer loads
             setTimeout(() => StickyBoard.activate(document), 300);
         }
     });
