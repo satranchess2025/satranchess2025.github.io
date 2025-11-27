@@ -16,7 +16,7 @@
 title: Rookpawn
 description: A theme for chess blogging with figurine notation, FEN diagrams, and a built-in simple PGN viewer. Forked from Athena, a simple and elegant theme for Jekyll and GitHub Pages. Requires chess.js and chessboard.js.
 # baseurl: "/athena" # the subpath of your site, e.g. /blog
-url: "https://satranchess2025.github.io" # the base hostname & protocol for your site
+url: "https://jekyllrookpawn.github.io" # the base hostname & protocol for your site
 # github_repo: athena # the GitHub repo name for your project
 # github_username: broccolini
 
