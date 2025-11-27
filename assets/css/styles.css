@@ -47,17 +47,3 @@ fen {display: none;}
   line-height: 1.4;
 }
   */
-
-  /* Visual truncation for homepage post blocks */
-.figurine-excerpt {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3; /* mobile */
-  overflow: hidden;
-}
-
-@media (min-width: 700px) {
-  .figurine-excerpt {
-    -webkit-line-clamp: 4;
-  }
-}
