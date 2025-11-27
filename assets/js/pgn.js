@@ -34,7 +34,7 @@
     return sanText;
   }
 
-  // ---- Flip "Surname, Firstname" → "Firstname Surname" -----------
+  // ---- Flip "Surname, Firstname" → "Firstname Surname" ----------
   function flipName(name) {
     if (!name) return "";
     var idx = name.indexOf(",");
@@ -60,11 +60,9 @@
         while (i < n && movetext.charAt(i) !== "}") i++;
         var raw = movetext.substring(start, i).trim();
 
-        // Comment containing diagram(s)
+        // Comment containing [D]
         if (raw.indexOf("[D]") !== -1) {
-
-          // SMALL only if comment inside variation
-          var isSmall = (varDepth > 0);
+          var isSmall = (varDepth > 0); // small only if inside variation
 
           events.push({
             type: "diagram",
@@ -73,23 +71,21 @@
             small: isSmall
           });
 
-          var cleanedText = raw.replace(/\[D\]/g, "").trim();
-          if (cleanedText.length > 0) {
+          var cleaned = raw.replace(/\[D\]/g, "").trim();
+          if (cleaned.length > 0) {
             events.push({
               type: "comment",
-              text: cleanedText,
+              text: cleaned,
               plyIndex: currentPly,
-              depth: 0
+              depth: varDepth
             });
           }
-
         } else {
-
           events.push({
             type: "comment",
             text: raw,
             plyIndex: currentPly,
-            depth: 0
+            depth: varDepth
           });
         }
 
@@ -114,50 +110,70 @@
         var innerEnd = i - 1;
         var inner = movetext.substring(innerStart, innerEnd).trim();
 
-        // ----- CASE A: comment inside variation contains [D] -----
+        // CASE A: comment inside variation containing [D]
         if (/\{[^}]*\[D\][^}]*\}/.test(inner)) {
+          // innerBeforeComment {commentWithD} innerAfterComment
+          var commentRegex = /\{([^}]*)\}/;
+          var cm = inner.match(commentRegex);
+          var innerBefore = "";
+          var innerAfter = "";
+          var rawComment = "";
 
-          // Extract the { ... } part
-          var commentMatch = inner.match(/\{([^}]*)\}/);
-          if (commentMatch) {
-            var rawComment = commentMatch[1].trim();
-
-            events.push({
-              type: "diagram",
-              plyIndex: currentPly,
-              depth: varDepth,
-              small: true    // comment + variation => small
-            });
-
-            var cleanedComment = rawComment.replace(/\[D\]/g, "").trim();
-            if (cleanedComment.length > 0) {
-              events.push({
-                type: "comment",
-                text: cleanedComment,
-                plyIndex: currentPly,
-                depth: varDepth
-              });
-            }
+          if (cm) {
+            rawComment = cm[1].trim();
+            var commentFull = cm[0];
+            var commentIndex = inner.indexOf(commentFull);
+            innerBefore = inner.substring(0, commentIndex).trim(); // e.g. "8. Na3"
+            innerAfter = inner.substring(commentIndex + commentFull.length).trim(); // e.g. "Rg8 9. Nb1..."
           }
 
-          // Remove the comment from variation text
-          inner = inner.replace(/\{[^}]*\}/g, "").trim();
-        }
+          // Split comment around [D]
+          var parts = rawComment.split("[D]");
+          var commentBefore = (parts[0] || "").trim();  // "de düşünülebilemezdi."
+          var commentAfter  = (parts[1] || "").trim();  // "Sonracığma şunlar olurdu:"
 
-        // ----- CASE B: direct variation-level [D] → normal -----
-        if (/^\[D\]$/.test(inner)) {
+          // HEAD paragraph: first move + commentBefore
+          events.push({
+            type: "variation_head",
+            plyIndex: currentPly,
+            depth: varDepth,
+            headMoves: innerBefore,
+            headComment: commentBefore
+          });
+
+          // Diagram: small (comment inside variation)
           events.push({
             type: "diagram",
             plyIndex: currentPly,
             depth: varDepth,
-            small: false
+            small: true
           });
-          varDepth--;
-          continue;
-        }
 
-        // ----- Variation text remains -----
-        if (/(O-O|O-O-O|[KQRBN]|^\d+\.)/.test(inner)) {
+          // TAIL paragraph: commentAfter + full variation moves with numbering restarted
+          // Variation root moves string = innerBefore + " " + innerAfter
+          var allMoves = (innerBefore ? innerBefore + " " : "") +
+                         (innerAfter || "");
+          allMoves = allMoves.trim();
+
+          events.push({
+            type: "variation_tail",
+            plyIndex: currentPly,
+            depth: varDepth,
+            tailComment: commentAfter,
+            allMoves: allMoves
+          });
+
+        // CASE B: direct variation-level [D] like "([D])"
+        } else if (/^\[D\]$/.test(inner)) {
+          events.push({
+            type: "diagram",
+            plyIndex: currentPly,
+            depth: varDepth,
+            small: false   // full-size diagram for pure variation [D]
+          });
+
+        // CASE C: normal variation with no [D] in comments
+        } else if (/(O-O|O-O-O|[KQRBN]|^\d+\.)/.test(inner)) {
           events.push({
             type: "variation",
             text: inner,
@@ -213,7 +229,6 @@
     var headerLines = [], movetextLines = [];
     var inHeader = true;
 
-    // Extract header and moves
     for (var li = 0; li < lines.length; li++) {
       var t = lines[li].trim();
       if (inHeader && t.startsWith("[") && t.endsWith("]")) {
@@ -271,7 +286,7 @@
     wrapper.appendChild(currentP);
     var lastMoveSpan = null;
 
-    // Pre-move events
+    // Events before move 1
     while (eventIdx < events.length && events[eventIdx].plyIndex === 0) {
       insertEventBlock(wrapper, events[eventIdx], index, currentPly, game);
       eventIdx++;
@@ -294,7 +309,6 @@
 
       currentPly++;
 
-      // Insert events matching this ply
       while (eventIdx < events.length &&
              events[eventIdx].plyIndex === currentPly) {
 
@@ -307,13 +321,11 @@
       }
     }
 
-    // Append result
     if (result && lastMoveSpan) {
       lastMoveSpan.innerHTML =
         lastMoveSpan.innerHTML.trim() + " " + result;
     }
 
-    // Remove empty last paragraph
     if (currentP && currentP.textContent.trim() === "") {
       wrapper.removeChild(currentP);
     }
@@ -330,7 +342,6 @@
 
     // ---- DIAGRAM EVENT ----
     if (ev.type === "diagram") {
-
       var temp = new Chess();
       var fullHistory = game.history({ verbose: true });
 
@@ -350,7 +361,6 @@
       div.className = "pgn-diagram";
       div.id = id;
 
-      // Size: small or normal
       if (ev.small) {
         div.style.width = "250px";
       } else {
@@ -359,7 +369,6 @@
 
       wrapper.appendChild(div);
 
-      // Delay for DOM commit
       setTimeout(function () {
         var target = document.getElementById(id);
         if (!target) return;
@@ -374,16 +383,41 @@
       return;
     }
 
-    // ---- COMMENT / VARIATION ----
+    // ---- COMMENT / VARIATION / VARIATION_HEAD / VARIATION_TAIL ----
     var p = document.createElement("p");
-    p.className = (ev.type === "comment" ? "pgn-comment" : "pgn-variation");
+    var isComment = (ev.type === "comment");
+    p.className = isComment ? "pgn-comment" : "pgn-variation";
 
     var depth = ev.depth || 0;
     if (depth > 0) {
       p.style.marginLeft = (depth * 1.5) + "rem";
     }
 
-    p.textContent = normalizeResult(ev.text);
+    var text = "";
+
+    if (ev.type === "comment") {
+      text = ev.text || "";
+    } else if (ev.type === "variation") {
+      text = ev.text || "";
+    } else if (ev.type === "variation_head") {
+      // "8. Na3 de düşünülebilemezdi."
+      var s1 = ev.headMoves || "";
+      if (ev.headComment) {
+        if (s1) s1 += " ";
+        s1 += ev.headComment;
+      }
+      text = s1;
+    } else if (ev.type === "variation_tail") {
+      // "Sonracığma şunlar olurdu: 8. Na3 Rg8 9. Nb1 ..."
+      var s2 = ev.tailComment || "";
+      if (ev.allMoves) {
+        if (s2) s2 += " ";
+        s2 += ev.allMoves;
+      }
+      text = s2;
+    }
+
+    p.textContent = normalizeResult(text);
     wrapper.appendChild(p);
   }
 
