@@ -154,7 +154,7 @@
 }
 
 .sticky-move:hover {
-    text-decoration: underline;
+    text-decoration: none !important;
 }
 
 .sticky-move-active {
