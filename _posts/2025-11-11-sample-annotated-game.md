@@ -2,6 +2,7 @@
 layout: post
 title:  "Annotated game"
 date:   2025-11-11
+FEN: r2qk2r/pb1p1pp1/2p4p/4p3/3bP3/2N5/PPP2PPP/R1BQR1K1 w kq - 0 14
 ---
 
 ## Marius Gramb (2142) - GM Bogdan-Daniel Deac (2690)
