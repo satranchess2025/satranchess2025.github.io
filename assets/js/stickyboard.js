@@ -2,8 +2,8 @@
 (function () {
     "use strict";
 
-    if (typeof Chess === "undefined" || typeof Chessboard === "undefined") {
-        console.warn("stickyboard.js: chess.js or chessboard.js missing");
+    if (typeof Chessboard === "undefined") {
+        console.warn("stickyboard.js: chessboard.js missing");
         return;
     }
 
@@ -12,9 +12,9 @@
 
     var StickyBoard = {
         board: null,
-        moves: [],
-        moveSpans: [],
-        currentPly: -1,
+        fenMap: [],
+        sanSpans: [],
+        currentIndex: -1,
 
         initBoard() {
             if (document.getElementById("sticky-chessboard")) return;
@@ -35,69 +35,37 @@
             });
         },
 
-        loadMoves(history) {
-            this.moves = history || [];
+        showFEN(fen) {
+            this.board.position(fen, true);
         },
 
-        showPosition(plyIndex) {
-            if (plyIndex < 0) {
-                this.currentPly = -1;
-                this.board.position("start", true);
-                this.highlightMove(-1);
-                return;
-            }
+        highlight(i) {
+            this.sanSpans.forEach(s => s.classList.remove("sticky-move-active"));
 
-            this.currentPly = plyIndex;
-
-            var temp = new Chess();
-            for (var i = 0; i <= plyIndex && i < this.moves.length; i++) {
-                temp.move(this.moves[i]);
-            }
-
-            this.board.position(temp.fen(), true);
-            this.highlightMove(plyIndex);
-        },
-
-        highlightMove(plyIndex) {
-            this.moveSpans.forEach(s => s.classList.remove("sticky-move-active"));
-
-            var span = this.moveSpans.find(
-                s => parseInt(s.dataset.ply, 10) === plyIndex
-            );
+            var span = this.sanSpans[i];
             if (!span) return;
 
             span.classList.add("sticky-move-active");
-            this.scrollMoveIntoView(span);
-        },
 
-        scrollMoveIntoView(moveSpan) {
-            moveSpan.scrollIntoView({
+            span.scrollIntoView({
                 behavior: "smooth",
-                block: "center",
-                inline: "nearest"
+                block: "center"
             });
         },
 
-        gotoNext() {
-            if (this.currentPly + 1 < this.moves.length) {
-                this.showPosition(this.currentPly + 1);
-            }
+        goto(i) {
+            if (i < 0 || i >= this.fenMap.length) return;
+            this.currentIndex = i;
+            this.showFEN(this.fenMap[i].fen);
+            this.highlight(i);
         },
 
-        gotoPrev() {
-            if (this.currentPly - 1 >= 0) {
-                this.showPosition(this.currentPly - 1);
-            } else {
-                this.showPosition(-1);
-            }
+        next() {
+            this.goto(this.currentIndex + 1);
         },
 
-        // ⭐ NEW: Map SAN → ply index
-        findPlyFromSAN(san) {
-            for (let i = 0; i < this.moves.length; i++) {
-                if (this.moves[i].san === san) return i;
-            }
-            return -1;
+        prev() {
+            this.goto(this.currentIndex - 1);
         },
 
         activate(root) {
@@ -106,81 +74,48 @@
             var blocks = (root || document).querySelectorAll(".pgn-blog-block");
 
             blocks.forEach(block => {
-                if (block._pgnHistory && Array.isArray(block._pgnHistory)) {
-                    StickyBoard.loadMoves(block._pgnHistory);
-                } else {
-                    console.warn("stickyboard.js: no _pgnHistory found");
-                    return;
-                }
 
-                this.moveSpans = [];
-                var plyCounter = 0;
+                if (!block._fenMap) return;
+                this.fenMap = block._fenMap;
 
-                var spans = block.querySelectorAll("span");
+                // Extract all SAN in text
+                var p = block.querySelector(".pgn-movelist");
+                var text = p.innerHTML;
 
-                // Main moves
-                spans.forEach(span => {
-                    var cleanText = span.textContent
-                        .replace(/^\d+\.+/, "")
-                        .trim();
-
-                    var isSAN =
-                        /(O-O|O-O-O|[KQRBN♔♕♖♗♘]?[a-h]?[1-8]?x?[a-h][1-8](=[QRBN])?[+#]?)/.test(
-                            cleanText
-                        );
-
-                    var isMoveNumber = /^\d+\./.test(span.textContent.trim());
-
-                    if (isSAN || isMoveNumber) {
-                        span.classList.add("sticky-move");
-                        span.style.cursor = "pointer";
-
-                        if (isSAN) {
-                            span.dataset.ply = plyCounter;
-                            this.moveSpans.push(span);
-                            plyCounter++;
-                        } else {
-                            span.dataset.ply = plyCounter;
-                        }
-
-                        span.addEventListener("click", () => {
-                            this.showPosition(parseInt(span.dataset.ply, 10));
-                        });
+                // Replace SAN with clickable span
+                var withSpans = text.replace(
+                    /(O-O-O|O-O|[KQRBN♔♕♖♗♘]?[a-h]?[1-8]?x?[a-h][1-8](=[QRBN])?[+#]?)/g,
+                    function (match) {
+                        return `<span class="sticky-san">${match}</span>`;
                     }
-                });
+                );
 
-                // ⭐ Variation/comment SAN
-                var extras = block.querySelectorAll(".sticky-extra-move");
+                p.innerHTML = withSpans;
 
-                extras.forEach(span => {
-                    var san = span.textContent.trim();
-                    var ply = this.findPlyFromSAN(san);
-                    if (ply === -1) return;
+                this.sanSpans = Array.from(p.querySelectorAll(".sticky-san"));
 
-                    span.dataset.ply = ply;
-                    span.classList.add("sticky-move");
+                // Add click listeners
+                this.sanSpans.forEach((span, i) => {
                     span.style.cursor = "pointer";
-
-                    this.moveSpans.push(span);
+                    span.classList.add("sticky-move");
 
                     span.addEventListener("click", () => {
-                        this.showPosition(ply);
+                        StickyBoard.goto(i);
                     });
                 });
             });
 
-            // Keyboard navigation
+            // Keyboard
             window.addEventListener("keydown", e => {
-                var tag = (e.target.tagName || "").toLowerCase();
-                if (tag === "input" || tag === "textarea") return;
+                if (["input", "textarea"].includes((e.target.tagName || "").toLowerCase())) return;
 
                 if (e.key === "ArrowRight") {
                     e.preventDefault();
-                    this.gotoNext();
+                    this.next();
                 }
                 if (e.key === "ArrowLeft") {
                     e.preventDefault();
-                    this.gotoPrev();
+                    this.prev();
                 }
             });
         }
@@ -191,35 +126,32 @@
     style.textContent = `
 #sticky-chessboard {
     position: fixed;
-    bottom: 1.2rem;
-    right: 1.2rem;
+    bottom: 1rem;
+    right: 1rem;
     width: 300px !important;
     height: 300px !important;
-    z-index: 9999;
     border: 2px solid #444;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.3);
     background: #fff;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
-    border-radius: 4px;
+    z-index: 9999;
 }
 
 .sticky-move:hover {
     text-decoration: none !important;
+    cursor: pointer;
 }
 
 .sticky-move-active {
     background: #ffe38a;
     border-radius: 4px;
-    padding: 2px 4px;
+    padding: 2px 3px;
 }
 `;
     document.head.appendChild(style);
 
     document.addEventListener("DOMContentLoaded", () => {
-        if (window.PGNRenderer && window.PGNRenderer.run) {
-            StickyBoard.activate(document);
-        } else {
-            setTimeout(() => StickyBoard.activate(document), 300);
-        }
+        if (window.PGNRenderer) StickyBoard.activate(document);
+        else setTimeout(() => StickyBoard.activate(document), 300);
     });
 
 })();

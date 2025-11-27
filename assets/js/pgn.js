@@ -6,33 +6,26 @@
     "https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png";
 
   function ensureDeps() {
-    if (typeof Chess === "undefined" || typeof Chessboard === "undefined") {
-      console.warn("pgn.js: chess.js or chessboard.js missing");
+    if (typeof Chess === "undefined") {
+      console.warn("pgn.js: chess.js missing");
       return false;
     }
     return true;
   }
 
+  // Remove result 1/2-1/2 → ½-½
   function normalizeResult(str) {
     return str ? str.replace(/1\/2-1\/2/g, "½-½") : "";
   }
 
+  // Extract year from PGN Date
   function extractYear(dateStr) {
     if (!dateStr) return "";
     var p = dateStr.split(".");
     return /^\d{4}$/.test(p[0]) ? p[0] : "";
   }
 
-  function formatNAGs(sanText) {
-    sanText = sanText.replace(/!!/, '<span class="nag nag-brilliant">!!</span>');
-    sanText = sanText.replace(/\?\?/, '<span class="nag nag-blunder">??</span>');
-    sanText = sanText.replace(/!\?/, '<span class="nag nag-interesting">!?</span>');
-    sanText = sanText.replace(/\?!/, '<span class="nag nag-dubious">?!</span>');
-    sanText = sanText.replace(/!/, '<span class="nag nag-good">!</span>');
-    sanText = sanText.replace(/\?/, '<span class="nag nag-mistake">?</span>');
-    return sanText;
-  }
-
+  // Flip “Surname, Name” → “Name Surname”
   function flipName(name) {
     if (!name) return "";
     var idx = name.indexOf(",");
@@ -40,233 +33,95 @@
     return name.substring(idx + 1).trim() + " " + name.substring(0, idx).trim();
   }
 
-  // ⭐ NEW — wrap SAN in clickable spans for StickyBoard
-  function StickyBoardWrapMoves(str) {
-    if (!str) return str;
+  // -------------------------------------
+  //  Parse PGN movetext into FULL SAN list
+  //  including variations + comments.
+  // -------------------------------------
+  function extractAllSANWithFEN(cleanedPGN) {
+    var game = new Chess();
+    game.load_pgn(cleanedPGN, { sloppy: true });
 
-    return str.replace(
-      /(O-O-O|O-O|[KQRBN]|♔|♕|♖|♗|♘)?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?[+#]?|O-O-O|O-O/g,
-      function (match) {
-        return '<span class="sticky-extra-move">' + match + '</span>';
-      }
-    );
-  }
+    // Re-parse manually to catch variation SAN too
+    var raw = cleanedPGN.split(/\n\n/)[1] || "";
+    var tokens = raw.split(/\s+/);
 
-  // ====================================================
-  //              PGN MOVETEXT PARSER
-  // ====================================================
-  function parseMovetext(movetext) {
-    var events = [];
-    var sanitizedParts = [];
-    var i = 0,
-      n = movetext.length;
-    var currentPly = 0;
-    var varDepth = 0;
+    var temp = new Chess();
+    var result = [];
 
-    while (i < n) {
-      var ch = movetext.charAt(i);
+    tokens.forEach(tok => {
+      tok = tok.trim();
 
-      // ============================
-      // COMMENTS {...}
-      // ============================
-      if (ch === "{") {
-        i++;
-        var start = i;
-        while (i < n && movetext.charAt(i) !== "}") i++;
-        var raw = movetext.substring(start, i).trim();
+      // Skip move numbers
+      if (/^\d+\.+$/.test(tok)) return;
 
-        if (raw.indexOf("[D]") !== -1) {
-          var isSmall = varDepth > 0;
-          events.push({
-            type: "diagram",
-            plyIndex: currentPly,
-            depth: varDepth,
-            small: isSmall,
-          });
+      // Skip NAGs
+      if (/^\$\d+$/.test(tok)) return;
 
-          var cleaned = raw.replace(/\[D\]/g, "").trim();
-          if (cleaned.length > 0) {
-            events.push({
-              type: "comment",
-              text: cleaned,
-              plyIndex: currentPly,
-              depth: varDepth,
-            });
-          }
-        } else {
-          events.push({
-            type: "comment",
-            text: raw,
-            plyIndex: currentPly,
-            depth: varDepth,
-          });
-        }
+      // Skip result
+      if (/^(1-0|0-1|1\/2-1\/2|½-½|\*)$/.test(tok)) return;
 
-        if (movetext.charAt(i) === "}") i++;
-        continue;
-      }
-
-      // ============================
-      // VARIATIONS (...)
-      // ============================
-      if (ch === "(") {
-        varDepth++;
-        i++;
-        var innerStart = i;
-        var depth = 1;
-
-        while (i < n && depth > 0) {
-          var c2 = movetext.charAt(i);
-          if (c2 === "(") depth++;
-          else if (c2 === ")") depth--;
-          i++;
-        }
-
-        var innerEnd = i - 1;
-        var inner = movetext.substring(innerStart, innerEnd).trim();
-
-        // Nested [D] inside variation
-        if (/\{[^}]*\[D\][^}]*\}/.test(inner)) {
-          var commentRegex = /\{([^}]*)\}/;
-          var cm = inner.match(commentRegex);
-          var innerBefore = "",
-            innerAfter = "",
-            rawComment = "";
-
-          if (cm) {
-            rawComment = cm[1].trim();
-            var commentFull = cm[0];
-            var commentIndex = inner.indexOf(commentFull);
-            innerBefore = inner.substring(0, commentIndex).trim();
-            innerAfter = inner.substring(commentIndex + commentFull.length).trim();
-          }
-
-          var parts = rawComment.split("[D]");
-          var commentBefore = (parts[0] || "").trim();
-          var commentAfter = (parts[1] || "").trim();
-
-          events.push({
-            type: "variation_head",
-            plyIndex: currentPly,
-            depth: varDepth,
-            headMoves: innerBefore,
-            headComment: commentBefore,
-          });
-
-          events.push({
-            type: "diagram",
-            plyIndex: currentPly,
-            depth: varDepth,
-            small: true,
-          });
-
-          var allMoves = (innerBefore ? innerBefore + " " : "") + (innerAfter || "");
-          allMoves = allMoves.trim();
-
-          events.push({
-            type: "variation_tail",
-            plyIndex: currentPly,
-            depth: varDepth,
-            tailComment: commentAfter,
-            allMoves: allMoves,
-          });
-        } else if (/^\[D\]$/.test(inner)) {
-          events.push({
-            type: "diagram",
-            plyIndex: currentPly,
-            depth: varDepth,
-            small: false,
-          });
-        } else if (/(O-O|O-O-O|[KQRBN]|^\d+\.)/.test(inner)) {
-          events.push({
-            type: "variation",
-            text: inner,
-            plyIndex: currentPly,
-            depth: varDepth,
-          });
-        }
-
-        varDepth--;
-        continue;
-      }
-
-      if (/\s/.test(ch)) {
-        sanitizedParts.push(" ");
-        i++;
-        continue;
-      }
-
-      var startTok = i;
-      while (i < n) {
-        var c3 = movetext.charAt(i);
-        if (/\s/.test(c3) || c3 === "{" || c3 === "(" || c3 === ")") break;
-        i++;
-      }
-
-      var tok = movetext.substring(startTok, i);
-      sanitizedParts.push(tok + " ");
-
-      if (/^\d+\.+$/.test(tok)) continue;
-      if (/^\$\d+$/.test(tok)) continue;
-      if (/^(1-0|0-1|1\/2-1\/2|½-½|\*)$/.test(tok)) continue;
-
+      // SAN?
       if (
-        /^(O-O(-O)?[+#]?|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](=[QRBN])?[+#]?|[a-h][1-8](=[QRBN])?[+#]?)$/.test(
-          tok
-        )
+        /^(O-O(-O)?[+#]?|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](=[QRBN])?[+#]?|[a-h][1-8](=[QRBN])?[+#]?)$/.test(tok)
       ) {
-        currentPly++;
+        var mv = temp.move(tok, { sloppy: true });
+        if (mv) {
+          result.push({ san: tok, fen: temp.fen() });
+        }
       }
-    }
+    });
 
-    var sanitized = sanitizedParts.join(" ").replace(/\s+/g, " ").trim();
-    return { sanitized, events };
+    return result;
   }
 
-  // ====================================================
-  //              RENDER PGN ELEMENT
-  // ====================================================
+  // -------------------------------------
+  //  RENDER <pgn> ELEMENT
+  // -------------------------------------
   function renderPGNElement(el, index) {
     if (!ensureDeps()) return;
 
     var raw = el.textContent.trim();
     var lines = raw.split(/\r?\n/);
-    var headerLines = [],
-      movetextLines = [];
+
+    var headerLines = [];
+    var movetextLines = [];
     var inHeader = true;
 
-    for (var li = 0; li < lines.length; li++) {
-      var t = lines[li].trim();
+    lines.forEach(line => {
+      var t = line.trim();
+
       if (inHeader && t.startsWith("[") && t.endsWith("]")) {
-        headerLines.push(lines[li]);
+        headerLines.push(line);
       } else if (inHeader && t === "") {
         inHeader = false;
       } else {
         inHeader = false;
-        movetextLines.push(lines[li]);
+        movetextLines.push(line);
       }
-    }
+    });
 
     var movetext = movetextLines.join(" ").replace(/\s+/g, " ").trim();
-    var parsed = parseMovetext(movetext);
-    var sanitized = parsed.sanitized;
-    var events = parsed.events;
-
     var cleanedPGN =
-      (headerLines.length ? headerLines.join("\n") + "\n\n" : "") + sanitized;
+      (headerLines.length ? headerLines.join("\n") + "\n\n" : "") + movetext;
 
+    // Full SAN/FEN map
+    var fenMap = extractAllSANWithFEN(cleanedPGN);
+
+    // Load into game for metadata
     var game = new Chess();
-    if (!game.load_pgn(cleanedPGN, { sloppy: true })) return;
+    game.load_pgn(cleanedPGN, { sloppy: true });
 
     var headers = game.header();
-    var moves = game.history({ verbose: true });
     var result = normalizeResult(headers.Result || "");
 
+    // Build wrapper
     var wrapper = document.createElement("div");
     wrapper.className = "pgn-blog-block";
 
-    wrapper._pgnHistory = moves;
+    // Export full variation-capable SAN→FEN map
+    wrapper._fenMap = fenMap;
 
+    // Header
     var white =
       (headers.WhiteTitle ? headers.WhiteTitle + " " : "") +
       flipName(headers.White || "") +
@@ -284,56 +139,13 @@
     h3.innerHTML = white + " – " + black + "<br>" + eventLine;
     wrapper.appendChild(h3);
 
-    var currentPly = 0;
-    var eventIdx = 0;
-    var currentP = document.createElement("p");
-    wrapper.appendChild(currentP);
-    var lastMoveSpan = null;
+    // Plain text (no indentation / formatting)
+    var p = document.createElement("p");
+    p.className = "pgn-movelist";
+    p.textContent = movetext + (result ? " " + result : "");
+    wrapper.appendChild(p);
 
-    while (eventIdx < events.length && events[eventIdx].plyIndex === 0) {
-      insertEventBlock(wrapper, events[eventIdx], index, currentPly, game);
-      eventIdx++;
-    }
-
-    for (var mi = 0; mi < moves.length; mi++) {
-      var m = moves[mi];
-      var moveNumber = Math.floor(mi / 2) + 1;
-      var isWhite = m.color === "w";
-
-      var prefix = "";
-      if (isWhite) prefix = moveNumber + ". ";
-      else if (currentP.textContent.trim() === "") prefix = moveNumber + "... ";
-
-      var span = document.createElement("span");
-      span.classList.add("pgn-move");
-      span.dataset.ply = currentPly;
-      span.innerHTML = prefix + formatNAGs(m.san) + " ";
-
-      currentP.appendChild(span);
-      lastMoveSpan = span;
-
-      currentPly++;
-
-      while (
-        eventIdx < events.length &&
-        events[eventIdx].plyIndex === currentPly
-      ) {
-        insertEventBlock(wrapper, events[eventIdx], index, currentPly, game);
-        currentP = document.createElement("p");
-        wrapper.appendChild(currentP);
-        eventIdx++;
-      }
-    }
-
-    if (result && lastMoveSpan) {
-      lastMoveSpan.innerHTML =
-        lastMoveSpan.innerHTML.trim() + " " + result;
-    }
-
-    if (currentP && currentP.textContent.trim() === "") {
-      wrapper.removeChild(currentP);
-    }
-
+    // Replace element
     el.replaceWith(wrapper);
 
     if (window.ChessFigurine && window.ChessFigurine.run) {
@@ -341,103 +153,18 @@
     }
   }
 
-  // ====================================================
-  //               INSERT EVENT BLOCKS
-  // ====================================================
-  function insertEventBlock(wrapper, ev, index, plyIndex, game) {
-    if (ev.type === "diagram") {
-      var temp = new Chess();
-      var fullHistory = game.history({ verbose: true });
-
-      for (var k = 0; k < plyIndex && k < fullHistory.length; k++) {
-        temp.move(fullHistory[k]);
-      }
-
-      var id =
-        "pgn-diagram-" +
-        index +
-        "-" +
-        plyIndex +
-        "-" +
-        Math.random().toString(36).substr(2, 8);
-
-      var div = document.createElement("div");
-      div.className = "pgn-diagram";
-      div.id = id;
-
-      div.style.width = ev.small ? "250px" : "340px";
-
-      if (ev.depth > 0) {
-        div.style.marginLeft = ev.depth * 1.5 + "rem";
-      }
-
-      wrapper.appendChild(div);
-
-      setTimeout(function () {
-        var target = document.getElementById(id);
-        if (!target) return;
-
-        Chessboard(target, {
-          position: temp.fen(),
-          draggable: false,
-          pieceTheme: PIECE_THEME_URL,
-        });
-      }, 0);
-
-      return;
-    }
-
-    var p = document.createElement("p");
-    p.className = ev.type === "comment" ? "pgn-comment" : "pgn-variation";
-    p.style.fontSize = "0.8rem";
-
-    var depth = ev.depth || 0;
-    if (depth > 0) {
-      p.style.marginLeft = depth * 1.5 + "rem";
-    }
-
-    var text = "";
-
-    if (ev.type === "comment") {
-      text = ev.text || "";
-    } else if (ev.type === "variation") {
-      text = ev.text || "";
-    } else if (ev.type === "variation_head") {
-      var s1 = ev.headMoves || "";
-      if (ev.headComment) {
-        if (s1) s1 += " ";
-        s1 += ev.headComment;
-      }
-      text = s1;
-    } else if (ev.type === "variation_tail") {
-      var s2 = ev.tailComment || "";
-      if (ev.allMoves) {
-        if (s2) s2 += " ";
-        s2 += ev.allMoves;
-      }
-      text = s2;
-    }
-
-    // ⭐ clickable SAN inside variations/comments
-    p.innerHTML = StickyBoardWrapMoves(normalizeResult(text));
-
-    wrapper.appendChild(p);
-  }
-
-  // ====================================================
-  //              RENDER ALL
-  // ====================================================
   function renderAll(root) {
-    var nodes = (root || document).querySelectorAll("pgn");
-    for (var i = 0; i < nodes.length; i++) renderPGNElement(nodes[i], i);
+    (root || document)
+      .querySelectorAll("pgn")
+      .forEach((el, i) => renderPGNElement(el, i));
   }
 
   function init() {
     renderAll(document);
     window.PGNRenderer = {
-      run: function (root) {
+      run(root) {
         renderAll(root || document.body);
-      },
+      }
     };
   }
 
