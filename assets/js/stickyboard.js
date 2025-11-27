@@ -12,8 +12,7 @@
 
     var StickyBoard = {
         board: null,
-        fenMap: [],
-        sanSpans: [],
+        moveSpans: [],
         currentIndex: -1,
 
         initBoard() {
@@ -35,29 +34,32 @@
             });
         },
 
-        showFEN(fen) {
-            this.board.position(fen, true);
+        collectMoves(root) {
+            this.moveSpans = Array.from(
+                (root || document).querySelectorAll(".sticky-move")
+            );
         },
 
-        highlight(i) {
-            this.sanSpans.forEach(s => s.classList.remove("sticky-move-active"));
+        goto(index) {
+            if (index < 0 || index >= this.moveSpans.length) return;
 
-            var span = this.sanSpans[i];
-            if (!span) return;
+            this.currentIndex = index;
+            var span = this.moveSpans[index];
+            var fen = span.dataset.fen;
+            if (!fen) return;
 
+            this.board.position(fen, true);
+
+            this.moveSpans.forEach(s =>
+                s.classList.remove("sticky-move-active")
+            );
             span.classList.add("sticky-move-active");
 
             span.scrollIntoView({
                 behavior: "smooth",
-                block: "center"
+                block: "center",
+                inline: "nearest"
             });
-        },
-
-        goto(i) {
-            if (i < 0 || i >= this.fenMap.length) return;
-            this.currentIndex = i;
-            this.showFEN(this.fenMap[i].fen);
-            this.highlight(i);
         },
 
         next() {
@@ -70,44 +72,20 @@
 
         activate(root) {
             this.initBoard();
+            this.collectMoves(root);
 
-            var blocks = (root || document).querySelectorAll(".pgn-blog-block");
-
-            blocks.forEach(block => {
-
-                if (!block._fenMap) return;
-                this.fenMap = block._fenMap;
-
-                // Extract all SAN in text
-                var p = block.querySelector(".pgn-movelist");
-                var text = p.innerHTML;
-
-                // Replace SAN with clickable span
-                var withSpans = text.replace(
-                    /(O-O-O|O-O|[KQRBN♔♕♖♗♘]?[a-h]?[1-8]?x?[a-h][1-8](=[QRBN])?[+#]?)/g,
-                    function (match) {
-                        return `<span class="sticky-san">${match}</span>`;
-                    }
-                );
-
-                p.innerHTML = withSpans;
-
-                this.sanSpans = Array.from(p.querySelectorAll(".sticky-san"));
-
-                // Add click listeners
-                this.sanSpans.forEach((span, i) => {
-                    span.style.cursor = "pointer";
-                    span.classList.add("sticky-move");
-
-                    span.addEventListener("click", () => {
-                        StickyBoard.goto(i);
-                    });
+            // Click handling
+            this.moveSpans.forEach((span, idx) => {
+                span.style.cursor = "pointer";
+                span.addEventListener("click", () => {
+                    this.goto(idx);
                 });
             });
 
-            // Keyboard
+            // Keyboard navigation
             window.addEventListener("keydown", e => {
-                if (["input", "textarea"].includes((e.target.tagName || "").toLowerCase())) return;
+                var tag = (e.target.tagName || "").toLowerCase();
+                if (tag === "input" || tag === "textarea") return;
 
                 if (e.key === "ArrowRight") {
                     e.preventDefault();
@@ -126,14 +104,15 @@
     style.textContent = `
 #sticky-chessboard {
     position: fixed;
-    bottom: 1rem;
-    right: 1rem;
+    bottom: 1.2rem;
+    right: 1.2rem;
     width: 300px !important;
     height: 300px !important;
-    border: 2px solid #444;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.3);
-    background: #fff;
     z-index: 9999;
+    border: 2px solid #444;
+    background: #fff;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    border-radius: 4px;
 }
 
 .sticky-move:hover {
@@ -144,14 +123,17 @@
 .sticky-move-active {
     background: #ffe38a;
     border-radius: 4px;
-    padding: 2px 3px;
+    padding: 2px 4px;
 }
 `;
     document.head.appendChild(style);
 
     document.addEventListener("DOMContentLoaded", () => {
-        if (window.PGNRenderer) StickyBoard.activate(document);
-        else setTimeout(() => StickyBoard.activate(document), 300);
+        if (window.PGNRenderer && window.PGNRenderer.run) {
+            StickyBoard.activate(document);
+        } else {
+            setTimeout(() => StickyBoard.activate(document), 300);
+        }
     });
 
 })();
