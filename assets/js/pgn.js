@@ -6,14 +6,20 @@
     "https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png";
 
   function ensureDeps() {
-    return !(typeof Chess === "undefined" || typeof Chessboard === "undefined");
+    if (typeof Chess === "undefined" || typeof Chessboard === "undefined") {
+      console.warn("pgn.js: Missing chess.js or chessboard.js");
+      return false;
+    }
+    return true;
   }
 
+  // Convert 1/2-1/2 into ½-½
   function normalizeResult(str) {
     if (!str) return "";
     return str.replace(/1\/2-1\/2/g, "½-½");
   }
 
+  // Queue for board initialization
   var pendingBoards = [];
 
   function queueBoard(id, fen) {
@@ -25,6 +31,7 @@
       var item = pendingBoards[i];
       var el = document.getElementById(item.id);
       if (!el) continue;
+
       Chessboard(item.id, {
         position: item.fen === "start" ? "start" : item.fen,
         draggable: false,
@@ -34,6 +41,7 @@
     pendingBoards = [];
   }
 
+  // Extract year safely from PGN Date
   function extractYear(dateStr) {
     if (!dateStr) return "";
     var parts = dateStr.split(".");
@@ -43,12 +51,12 @@
     return year;
   }
 
-  // Extract comments AND variations
+  // Extract comments {…} and variations (…)
   function extractCommentsAndVariations(raw) {
     var comments = [];
     var variations = [];
 
-    // Extract variations recursively
+    // Remove top-level variations and collect them
     function removeVariations(str) {
       var depth = 0;
       var start = -1;
@@ -72,10 +80,10 @@
       return out;
     }
 
-    // First strip variations
+    // 1) Strip variations and collect them
     var stripped = removeVariations(raw);
 
-    // Then extract comments
+    // 2) Extract comments { ... }
     var cleaned = stripped.replace(/\{([^}]+)\}/g, function (_, text) {
       comments.push(text.trim());
       return "";
@@ -94,21 +102,30 @@
     var raw = el.textContent.trim();
     raw = normalizeResult(raw);
 
-    // Extract comments + variations
+    // Extract comments and variations
     var extraction = extractCommentsAndVariations(raw);
     var strippedPGN = extraction.cleaned;
     var comments = extraction.comments;
     var variations = extraction.variations;
 
-    // Normalize variations (remove nested again, for safety)
+    // Filter variations: keep only those that contain at least one SAN-like move
     var flatVariations = [];
     for (var i = 0; i < variations.length; i++) {
-      var v = variations[i];
-      // remove nested parentheses in a variation
+      var v = variations[i].trim();
+
+      // Remove nested parentheses inside this variation
       while (/\([^()]*\)/.test(v)) {
         v = v.replace(/\([^()]*\)/g, "");
       }
-      if (v.trim().length > 0) flatVariations.push(v.trim());
+      v = v.trim();
+
+      // SAN-ish pattern: pieces, pawn moves, move numbers, castling
+      var sanPattern = /(O-O|O-O-O|[KQRBN][a-h1-8]|[a-h][1-8]|^\d+\.)/;
+
+      if (sanPattern.test(v)) {
+        flatVariations.push(v);
+      }
+      // Otherwise ignore junk like "DERLD"
     }
 
     var game = new Chess();
@@ -144,35 +161,38 @@
     var wrapper = document.createElement("div");
     wrapper.className = "pgn-blog-block";
 
-    // Title block
+    // Heading: one <h3> with <br>
     var h3 = document.createElement("h3");
     h3.innerHTML = white + " – " + black + "<br>" + eventLine;
     wrapper.appendChild(h3);
 
+    // Compute halfway ply index
     var half = Math.floor(moves.length / 2);
 
     // ----------------------------
-    // FIRST HALF MOVES
+    // FIRST HALF OF MOVES
     // ----------------------------
     var p1 = document.createElement("p");
 
-    for (var i = 0; i < moves.length; i++) {
-      var m = moves[i];
+    for (var mIndex = 0; mIndex < moves.length; mIndex++) {
+      var m = moves[mIndex];
       var isWhite = m.color === "w";
-      var moveNo = Math.floor(i / 2) + 1;
+      var moveNo = Math.floor(mIndex / 2) + 1;
 
       var span = document.createElement("span");
-      span.textContent = isWhite ? moveNo + ". " + m.san + " " : m.san + " ";
+      span.textContent = isWhite
+        ? moveNo + ". " + m.san + " "
+        : m.san + " ";
 
       p1.appendChild(span);
 
-      if (i === half - 1) break;
+      if (mIndex === half - 1) break;
     }
 
     wrapper.appendChild(p1);
 
     // ----------------------------
-    // Mid-game diagram
+    // MID-GAME DIAGRAM
     // ----------------------------
     game.reset();
     for (var x = 0; x < half; x++) {
@@ -188,29 +208,29 @@
     queueBoard(midId, midFen);
 
     // ----------------------------
-    // COMMENTS + VARIATIONS
+    // COMMENTS + VARIATIONS PARAGRAPH
     // ----------------------------
     if (comments.length > 0 || flatVariations.length > 0) {
       var commentWrap = document.createElement("p");
       commentWrap.className = "pgn-comments";
 
       for (var c = 0; c < comments.length; c++) {
-        var com = document.createElement("div");
-        com.textContent = comments[c];
-        commentWrap.appendChild(com);
+        var comLine = document.createElement("div");
+        comLine.textContent = comments[c];
+        commentWrap.appendChild(comLine);
       }
 
-      for (var v = 0; v < flatVariations.length; v++) {
-        var vr = document.createElement("div");
-        vr.textContent = "Variation: " + flatVariations[v];
-        commentWrap.appendChild(vr);
+      for (var vIdx = 0; vIdx < flatVariations.length; vIdx++) {
+        var varLine = document.createElement("div");
+        varLine.textContent = "Variation: " + flatVariations[vIdx];
+        commentWrap.appendChild(varLine);
       }
 
       wrapper.appendChild(commentWrap);
     }
 
     // ----------------------------
-    // SECOND HALF MOVES
+    // SECOND HALF OF MOVES
     // ----------------------------
     var p2 = document.createElement("p");
 
@@ -223,28 +243,35 @@
       span2.textContent = isWhite2
         ? moveNo2 + ". " + mm.san + " "
         : mm.san + " ";
+
       p2.appendChild(span2);
     }
 
-    // Append result to last move inline
+    // Append result inline to last move
     if (result) {
-      var last = p2.lastChild;
-      if (last) last.textContent = last.textContent.trim() + " " + result;
+      var lastSpan = p2.lastChild;
+      if (lastSpan) {
+        lastSpan.textContent = lastSpan.textContent.trim() + " " + result;
+      }
     }
 
     wrapper.appendChild(p2);
 
+    // Replace original <pgn> element
     el.replaceWith(wrapper);
 
+    // Initialize any pending boards
     initAllBoards();
 
-    if (window.ChessFigurine && window.ChessFigurine.run) {
+    // Apply figurine conversion to the rendered block
+    if (window.ChessFigurine && typeof window.ChessFigurine.run === "function") {
       ChessFigurine.run(wrapper);
     }
   }
 
   function renderAll(root) {
-    var nodes = (root || document).querySelectorAll("pgn");
+    var scope = root || document;
+    var nodes = scope.querySelectorAll("pgn");
     for (var i = 0; i < nodes.length; i++) {
       renderPGNElement(nodes[i], i);
     }
@@ -260,7 +287,9 @@
     };
   }
 
-  if (document.readyState === "loading")
+  if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", init);
-  else init();
+  } else {
+    init();
+  }
 })();
