@@ -25,7 +25,6 @@
       var item = pendingBoards[i];
       var el = document.getElementById(item.id);
       if (!el) continue;
-
       Chessboard(item.id, {
         position: item.fen === "start" ? "start" : item.fen,
         draggable: false,
@@ -39,18 +38,54 @@
     if (!dateStr) return "";
     var parts = dateStr.split(".");
     if (!parts.length) return "";
-    if (/^\d{4}$/.test(parts[0])) return parts[0];
-    return "";
+    var year = parts[0];
+    if (!/^\d{4}$/.test(year)) return "";
+    return year;
   }
 
-  // Strip comments but store them
-  function extractComments(raw) {
+  // Extract comments AND variations
+  function extractCommentsAndVariations(raw) {
     var comments = [];
-    var cleaned = raw.replace(/\{([^}]+)\}/g, function (_, text) {
+    var variations = [];
+
+    // Extract variations recursively
+    function removeVariations(str) {
+      var depth = 0;
+      var start = -1;
+      var out = "";
+      for (var i = 0; i < str.length; i++) {
+        var ch = str[i];
+
+        if (ch === "(") {
+          if (depth === 0) start = i;
+          depth++;
+        } else if (ch === ")") {
+          depth--;
+          if (depth === 0 && start !== -1) {
+            var inside = str.substring(start + 1, i);
+            variations.push(inside.trim());
+          }
+        } else if (depth === 0) {
+          out += ch;
+        }
+      }
+      return out;
+    }
+
+    // First strip variations
+    var stripped = removeVariations(raw);
+
+    // Then extract comments
+    var cleaned = stripped.replace(/\{([^}]+)\}/g, function (_, text) {
       comments.push(text.trim());
       return "";
     });
-    return { cleaned: cleaned, comments: comments };
+
+    return {
+      cleaned: cleaned,
+      comments: comments,
+      variations: variations
+    };
   }
 
   function renderPGNElement(el, index) {
@@ -59,10 +94,22 @@
     var raw = el.textContent.trim();
     raw = normalizeResult(raw);
 
-    // Extract comments
-    var extraction = extractComments(raw);
+    // Extract comments + variations
+    var extraction = extractCommentsAndVariations(raw);
     var strippedPGN = extraction.cleaned;
     var comments = extraction.comments;
+    var variations = extraction.variations;
+
+    // Normalize variations (remove nested again, for safety)
+    var flatVariations = [];
+    for (var i = 0; i < variations.length; i++) {
+      var v = variations[i];
+      // remove nested parentheses in a variation
+      while (/\([^()]*\)/.test(v)) {
+        v = v.replace(/\([^()]*\)/g, "");
+      }
+      if (v.trim().length > 0) flatVariations.push(v.trim());
+    }
 
     var game = new Chess();
     var ok = game.load_pgn(strippedPGN, { sloppy: true });
@@ -97,17 +144,16 @@
     var wrapper = document.createElement("div");
     wrapper.className = "pgn-blog-block";
 
-    // Heading
+    // Title block
     var h3 = document.createElement("h3");
     h3.innerHTML = white + " – " + black + "<br>" + eventLine;
     wrapper.appendChild(h3);
 
-    // Middle index
     var half = Math.floor(moves.length / 2);
 
-    // ------------------------------------
+    // ----------------------------
     // FIRST HALF MOVES
-    // ------------------------------------
+    // ----------------------------
     var p1 = document.createElement("p");
 
     for (var i = 0; i < moves.length; i++) {
@@ -117,6 +163,7 @@
 
       var span = document.createElement("span");
       span.textContent = isWhite ? moveNo + ". " + m.san + " " : m.san + " ";
+
       p1.appendChild(span);
 
       if (i === half - 1) break;
@@ -124,9 +171,9 @@
 
     wrapper.appendChild(p1);
 
-    // ------------------------------------
-    // MID DIAGRAM
-    // ------------------------------------
+    // ----------------------------
+    // Mid-game diagram
+    // ----------------------------
     game.reset();
     for (var x = 0; x < half; x++) {
       game.move(moves[x].san);
@@ -138,28 +185,33 @@
     midDiv.id = midId;
     midDiv.className = "pgn-board";
     wrapper.appendChild(midDiv);
-
     queueBoard(midId, midFen);
 
-    // ------------------------------------
-    // COMMENTS paragraph (if any)
-    // ------------------------------------
-    if (comments.length > 0) {
+    // ----------------------------
+    // COMMENTS + VARIATIONS
+    // ----------------------------
+    if (comments.length > 0 || flatVariations.length > 0) {
       var commentWrap = document.createElement("p");
       commentWrap.className = "pgn-comments";
 
       for (var c = 0; c < comments.length; c++) {
-        var line = document.createElement("div");
-        line.textContent = comments[c];
-        commentWrap.appendChild(line);
+        var com = document.createElement("div");
+        com.textContent = comments[c];
+        commentWrap.appendChild(com);
+      }
+
+      for (var v = 0; v < flatVariations.length; v++) {
+        var vr = document.createElement("div");
+        vr.textContent = "Variation: " + flatVariations[v];
+        commentWrap.appendChild(vr);
       }
 
       wrapper.appendChild(commentWrap);
     }
 
-    // ------------------------------------
+    // ----------------------------
     // SECOND HALF MOVES
-    // ------------------------------------
+    // ----------------------------
     var p2 = document.createElement("p");
 
     for (var j = half; j < moves.length; j++) {
@@ -174,12 +226,10 @@
       p2.appendChild(span2);
     }
 
-    // Append result to last move
+    // Append result to last move inline
     if (result) {
       var last = p2.lastChild;
-      if (last) {
-        last.textContent = last.textContent.trim() + " " + result;
-      }
+      if (last) last.textContent = last.textContent.trim() + " " + result;
     }
 
     wrapper.appendChild(p2);
