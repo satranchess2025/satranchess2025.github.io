@@ -1,12 +1,12 @@
 .fen-board,
-.pgn-board {
+.pgn-diagram {
   width: 400px;
   max-width: 100%;
   margin: 2rem 0;
 }
 
 #board,
-.pgn-board,
+.pgn-diagram,
 .board {width: 400px;}
 .board-wrapper {max-width: 400px !important;}
 
@@ -20,10 +20,10 @@
 .fen-board *,
 .fen-board *::before,
 .fen-board *::after,
-.pgn-board *,
-.pgn-board *::before,
-.pgn-board *::after,
-.board-wrapper * {
+.pgn-diagram *,
+.pgn-diagram *::before,
+.pgn-diagram *::after,
+.board-wrapper {
   box-sizing: content-box !important; 
 }
 
