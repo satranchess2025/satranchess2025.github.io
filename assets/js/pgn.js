@@ -5,16 +5,16 @@
   const PIECE_THEME_URL =
     "https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png";
 
-  // Allow both O-O and 0-0 / 0-0-0 as castling
   const SAN_CORE_REGEX =
     /^([O0]-[O0](-[O0])?[+#]?|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](=[QRBN])?[+#]?|[a-h][1-8](=[QRBN])?[+#]?)$/;
 
   const RESULT_REGEX = /^(1-0|0-1|1\/2-1\/2|½-½|\*)$/;
-  const MOVE_NUMBER_REGEX = /^(\d+)(\.+)$/; // e.g. 4. or 4...
+  const MOVE_NUMBER_REGEX = /^(\d+)(\.+)$/;
+
+  // NEW — evaluation-only token detector
+  const EVAL_TOKEN = /^[\+\-=∞]+$/;
 
   let diagramCounter = 0;
-
-  // --- helpers ---
 
   function ensureDeps() {
     if (typeof Chess === "undefined") {
@@ -71,19 +71,16 @@
     }, 0);
   }
 
-  // ---------- PGNGameView ----------
-
   class PGNGameView {
     constructor(el) {
       this.sourceEl = el;
       this.wrapper = document.createElement("div");
       this.wrapper.className = "pgn-blog-block";
+      this.lastLiteralToken = null; // NEW — for eval collapse
 
       this.buildFromElement();
       this.applyFigurines();
     }
-
-    // --- static helpers ---
 
     static isSANCore(tok) {
       return SAN_CORE_REGEX.test(tok);
@@ -91,28 +88,25 @@
 
     static splitHeadersAndMovetext(raw) {
       const lines = raw.split(/\r?\n/);
-
       const headerLines = [];
       const movetextLines = [];
       let inHeader = true;
 
-      lines.forEach((line) => {
+      for (const line of lines) {
         const t = line.trim();
-        if (inHeader && t.startsWith("[") && t.endsWith("]")) {
-          headerLines.push(line);
-        } else if (inHeader && t === "") {
-          inHeader = false;
-        } else {
+        if (inHeader && t.startsWith("[") && t.endsWith("]")) headerLines.push(line);
+        else if (inHeader && t === "") inHeader = false;
+        else {
           inHeader = false;
           movetextLines.push(line);
         }
-      });
+      }
 
-      const movetext = movetextLines.join(" ").replace(/\s+/g, " ").trim();
-      return { headerLines, movetext };
+      return {
+        headerLines,
+        movetext: movetextLines.join(" ").replace(/\s+/g, " ").trim()
+      };
     }
-
-    // --- main entry per <pgn> ---
 
     buildFromElement() {
       const raw = this.sourceEl.textContent.trim();
@@ -128,7 +122,6 @@
 
       this.createHeader(headers);
       this.buildMovetextDOM(movetext + (result ? " " + result : ""));
-
       this.sourceEl.replaceWith(this.wrapper);
     }
 
@@ -147,9 +140,7 @@
       const eventLine = (headers.Event || "") + (year ? ", " + year : "");
 
       const h3 = document.createElement("h3");
-      const titleLine = `${white} \u2013 ${black}`; // en dash
-
-      h3.appendChild(document.createTextNode(titleLine));
+      h3.appendChild(document.createTextNode(`${white} – ${black}`));
       h3.appendChild(document.createElement("br"));
       h3.appendChild(document.createTextNode(eventLine));
       this.wrapper.appendChild(h3);
@@ -164,53 +155,40 @@
       }
     }
 
-    // --- move handling ---
-
+    // --- SAN move handler with numbering ---
     handleSAN(displayToken, ctx) {
-      // Strip trailing non-SAN characters (e.g. "+-", "?!", "!!")
       let core = displayToken.replace(/[^a-hKQRBN0-9=O0-]+$/g, "");
-      // Normalize 0-0 -> O-O to make chess.js happy
       core = core.replace(/0/g, "O");
-      if (!PGNGameView.isSANCore(core)) {
-        appendText(ctx.container, displayToken + " ");
-        return null;
-      }
 
-      // Compute global ply BEFORE this move
+      if (!PGNGameView.isSANCore(core)) return null;
+
       const baseLen =
         typeof ctx.baseHistoryLen === "number" ? ctx.baseHistoryLen : 0;
       const localHist = ctx.chess.history().length;
-      const plyBefore = baseLen + localHist;
-      const isWhiteToMove = plyBefore % 2 === 0;
-      const moveNumber = Math.floor(plyBefore / 2) + 1;
+      const ply = baseLen + localHist;
+      const isWhite = ply % 2 === 0;
+      const moveNumber = Math.floor(ply / 2) + 1;
 
-      // MAINLINE: always number white, number black only after interruption
       if (ctx.type === "main") {
-        if (isWhiteToMove) {
-          appendText(ctx.container, moveNumber + ". ");
-        } else if (ctx.lastWasInterrupt) {
-          appendText(ctx.container, moveNumber + "... ");
-        }
+        if (isWhite) appendText(ctx.container, moveNumber + ". ");
+        else if (ctx.lastWasInterrupt) appendText(ctx.container, moveNumber + "... ");
       } else {
-        // VARIATION: always number white, number black only if interruption
-        if (isWhiteToMove) {
-          appendText(ctx.container, moveNumber + ". ");
-        } else if (ctx.lastWasInterrupt) {
-          appendText(ctx.container, moveNumber + "... ");
-        }
+        if (isWhite) appendText(ctx.container, moveNumber + ". ");
+        else if (ctx.lastWasInterrupt) appendText(ctx.container, moveNumber + "... ");
       }
 
-      // Store branch info for future variations
       ctx.prevFen = ctx.chess.fen();
       ctx.prevHistoryLen = baseLen + localHist;
 
       const mv = ctx.chess.move(core, { sloppy: true });
       if (!mv) {
         appendText(ctx.container, displayToken + " ");
+        this.lastLiteralToken = displayToken;
         return null;
       }
 
       ctx.lastWasInterrupt = false;
+      this.lastLiteralToken = null;
 
       const span = document.createElement("span");
       span.className = "pgn-move sticky-move";
@@ -221,8 +199,7 @@
       return span;
     }
 
-    // --- comment parsing: pure text + diagrams, no SAN moves ---
-
+    // --- comment parser ---
     parseComment(movetext, pos, ctx) {
       const n = movetext.length;
       let idx = pos;
@@ -231,35 +208,25 @@
       const content = movetext.substring(pos, idx);
       if (idx < n && movetext[idx] === "}") idx++;
 
-      this.ensureParagraph(
-        ctx,
-        ctx.type === "main" ? "pgn-mainline" : "pgn-variation"
-      );
+      this.ensureParagraph(ctx, ctx.type === "main" ? "pgn-mainline" : "pgn-variation");
 
       const parts = content.split("[D]");
-      for (let pIndex = 0; pIndex < parts.length; pIndex++) {
-        const textPart = parts[pIndex];
-        if (textPart && textPart.trim()) {
-          appendText(ctx.container, " " + textPart.trim());
-        }
-        if (pIndex < parts.length - 1) {
-          // Diagram inside comment uses current outer position
-          createDiagram(this.wrapper, ctx.chess.fen());
-        }
+      for (let k = 0; k < parts.length; k++) {
+        const text = parts[k].trim();
+        if (text) appendText(ctx.container, " " + text);
+        if (k < parts.length - 1) createDiagram(this.wrapper, ctx.chess.fen());
       }
 
-      // Comment counts as interruption for numbering
       ctx.lastWasInterrupt = true;
-
+      this.lastLiteralToken = null;
       return idx;
     }
 
-    // --- movetext walker ---
-
+    // --- main parser ---
     buildMovetextDOM(movetext) {
       const mainChess = new Chess();
 
-      const rootCtx = {
+      let ctx = {
         type: "main",
         chess: mainChess,
         container: null,
@@ -269,7 +236,6 @@
         prevHistoryLen: 0,
         baseHistoryLen: null
       };
-      let ctx = rootCtx;
 
       let i = 0;
       const n = movetext.length;
@@ -277,145 +243,122 @@
       while (i < n) {
         const ch = movetext[i];
 
-        // Whitespace
         if (/\s/.test(ch)) {
           while (i < n && /\s/.test(movetext[i])) i++;
-          this.ensureParagraph(
-            ctx,
-            ctx.type === "main" ? "pgn-mainline" : "pgn-variation"
-          );
+          this.ensureParagraph(ctx, ctx.type === "main" ? "pgn-mainline" : "pgn-variation");
           appendText(ctx.container, " ");
           continue;
         }
 
-        // Start variation
         if (ch === "(") {
           i++;
-
-          // Branch from position BEFORE last mainline move (if we have one)
           const branchFen = ctx.prevFen || ctx.chess.fen();
-          const branchHist =
+          const branchLen =
             typeof ctx.prevHistoryLen === "number"
               ? ctx.prevHistoryLen
               : ctx.chess.history().length;
 
-          const varChess = new Chess(branchFen);
-          const varCtx = {
+          ctx = {
             type: "variation",
-            chess: varChess,
+            chess: new Chess(branchFen),
             container: null,
             parent: ctx,
-            lastWasInterrupt: true, // so first black move shows "4..."
+            lastWasInterrupt: true,
             prevFen: branchFen,
-            prevHistoryLen: branchHist,
-            baseHistoryLen: branchHist
+            prevHistoryLen: branchLen,
+            baseHistoryLen: branchLen
           };
-          ctx = varCtx;
           this.ensureParagraph(ctx, "pgn-variation");
           continue;
         }
 
-        // End variation
         if (ch === ")") {
           i++;
           if (ctx.parent) {
             ctx = ctx.parent;
-            ctx.lastWasInterrupt = true; // returning from var = interruption
-            ctx.container = null; // next text in parent starts fresh paragraph
+            ctx.lastWasInterrupt = true;
+            ctx.container = null;
           }
           continue;
         }
 
-        // Comment
         if (ch === "{") {
           i = this.parseComment(movetext, i + 1, ctx);
           continue;
         }
 
-        // Normal token
         const start = i;
         while (i < n) {
           const c2 = movetext[i];
-          if (/\s/.test(c2) || c2 === "(" || c2 === ")" || c2 === "{" || c2 === "}") {
-            break;
-          }
+          if (/\s/.test(c2) || "(){}".includes(c2)) break;
           i++;
         }
-        const token = movetext.substring(start, i);
+        let token = movetext.substring(start, i);
         if (!token) continue;
 
-        // Diagram marker
         if (token === "[D]") {
           createDiagram(this.wrapper, ctx.chess.fen());
           ctx.lastWasInterrupt = true;
           ctx.container = null;
+          this.lastLiteralToken = null;
           continue;
         }
 
-        // Game result
         if (RESULT_REGEX.test(token)) {
-          this.ensureParagraph(
-            ctx,
-            ctx.type === "main" ? "pgn-mainline" : "pgn-variation"
-          );
+          this.ensureParagraph(ctx, ctx.type === "main" ? "pgn-mainline" : "pgn-variation");
           appendText(ctx.container, token + " ");
+          this.lastLiteralToken = token;
           continue;
         }
 
-        // Literal move numbers like "4." or "4..."
-        // We IGNORE them and generate numbering ourselves.
         if (MOVE_NUMBER_REGEX.test(token)) {
           continue;
         }
 
-        // SAN move (or plain token)
-        this.ensureParagraph(
-          ctx,
-          ctx.type === "main" ? "pgn-mainline" : "pgn-variation"
-        );
+        // --- literal text OR SAN ---
+        this.ensureParagraph(ctx, ctx.type === "main" ? "pgn-mainline" : "pgn-variation");
+
+        // NEW — collapse repeated evaluation symbols
+        if (!PGNGameView.isSANCore(token.replace(/[^a-hKQRBN0-9=O0-]+$/g, ""))) {
+          if (EVAL_TOKEN.test(token) && token === this.lastLiteralToken) {
+            // skip duplicate "+-" or similar
+            continue;
+          }
+          appendText(ctx.container, token + " ");
+          this.lastLiteralToken = token;
+          continue;
+        }
+
         const sanSpan = this.handleSAN(token, ctx);
         if (!sanSpan) {
           appendText(ctx.container, token + " ");
+          this.lastLiteralToken = token;
         }
       }
     }
 
-    // --- figurines only on move spans ---
-
+    // --- figurines ---
     applyFigurines() {
-      const map = {
-        K: "♔",
-        Q: "♕",
-        R: "♖",
-        B: "♗",
-        N: "♘"
-      };
+      const map = { K: "♔", Q: "♕", R: "♖", B: "♗", N: "♘" };
 
-      const moveSpans = this.wrapper.querySelectorAll(".pgn-move");
-      moveSpans.forEach((span) => {
-        const text = span.textContent;
-        const match = text.match(/^([KQRBN])(.+?)(\s*)$/);
-        if (!match) return;
-        const [, letter, rest, ws] = match;
-        const fig = map[letter];
-        if (!fig) return;
-        span.textContent = fig + rest + (ws || "");
+      const spans = this.wrapper.querySelectorAll(".pgn-move");
+      spans.forEach((span) => {
+        const m = span.textContent.match(/^([KQRBN])(.+?)(\s*)$/);
+        if (!m) return;
+        span.textContent = map[m[1]] + m[2] + (m[3] || "");
       });
     }
   }
 
-  // ---------- PGNRenderer ----------
-
   class PGNRenderer {
     static renderAll(root) {
-      const scope = root || document;
-      const elements = scope.querySelectorAll("pgn");
-      elements.forEach((el) => new PGNGameView(el));
+      (root || document)
+        .querySelectorAll("pgn")
+        .forEach((el) => new PGNGameView(el));
     }
 
     static init() {
       if (!ensureDeps()) return;
-
       PGNRenderer.renderAll(document);
 
       window.PGNRenderer = {
@@ -427,9 +370,7 @@
   }
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", () => {
-      PGNRenderer.init();
-    });
+    document.addEventListener("DOMContentLoaded", () => PGNRenderer.init());
   } else {
     PGNRenderer.init();
   }
