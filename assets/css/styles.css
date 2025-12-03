@@ -53,20 +53,10 @@
 .nag-dubious { color: #996600; }
 
 /* Variation indentation already handled via JS marginLeft */
-.pgn-variation {
-  font-style: italic;
-  margin: 0.25rem 0;
-}
-
+.pgn-variation,
 .pgn-comment {
-  font-style: italic;
   margin: 0.25rem 0;
-}
-
-/* Remove italics from variations */
-.pgn-variation {
-  font-style: normal !important;
-  color: #666 !important;   /* medium gray — lighter than mainline */
+  color: #666;
 }
 
 /* If the moves themselves are inside spans, make them match */
@@ -74,9 +64,4 @@
   color: #666 !important;
 }
 
-/* Optional: make inline comments inside variations slightly lighter but still readable */
-.pgn-variation .pgn-comment {
-  color: #777 !important;
-  font-style: normal !important;
-}
 
