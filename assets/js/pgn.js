@@ -58,7 +58,7 @@
     div.style.maxWidth = "100%";
     wrapper.appendChild(div);
 
-    setTimeout(function () {
+    setTimeout(() => {
       const target = document.getElementById(id);
       if (!target) return;
       Chessboard(target, {
@@ -75,6 +75,7 @@
       this.wrapper = document.createElement("div");
       this.wrapper.className = "pgn-blog-block";
       this.lastLiteralToken = null;
+      this.lastWasMove = false; // SAN geldiyse true
 
       this.buildFromElement();
       this.applyFigurines();
@@ -92,11 +93,10 @@
 
       for (const line of lines) {
         const t = line.trim();
-        if (inHeader && t.startsWith("[") && t.endsWith("]")) {
+        if (inHeader && t.startsWith("[") && t.endsWith("]"))
           headerLines.push(line);
-        } else if (inHeader && t === "") {
-          inHeader = false;
-        } else {
+        else if (inHeader && t === "") inHeader = false;
+        else {
           inHeader = false;
           movetextLines.push(line);
         }
@@ -110,7 +110,8 @@
 
     buildFromElement() {
       const raw = this.sourceEl.textContent.trim();
-      const { headerLines, movetext } = PGNGameView.splitHeadersAndMovetext(raw);
+      const { headerLines, movetext } =
+        PGNGameView.splitHeadersAndMovetext(raw);
 
       const cleanedPGN =
         (headerLines.length ? headerLines.join("\n") + "\n\n" : "") + movetext;
@@ -155,49 +156,44 @@
       }
     }
 
+    // --- SAN işlemi ---
     handleSAN(displayToken, ctx) {
       let core = displayToken.replace(/[^a-hKQRBN0-9=O0-]+$/g, "");
       core = core.replace(/0/g, "O");
 
       if (!PGNGameView.isSANCore(core)) {
         appendText(ctx.container, displayToken + " ");
-        this.lastLiteralToken = displayToken;
+        this.lastWasMove = false;
         return null;
       }
 
-      const baseLen =
-        typeof ctx.baseHistoryLen === "number" ? ctx.baseHistoryLen : 0;
-      const localHist = ctx.chess.history().length;
-      const ply = baseLen + localHist;
+      const base = ctx.baseHistoryLen || 0;
+      const before = ctx.chess.history().length;
+      const ply = base + before;
       const isWhite = ply % 2 === 0;
-      const moveNumber = Math.floor(ply / 2) + 1;
+      const moveNo = Math.floor(ply / 2) + 1;
 
       if (ctx.type === "main") {
-        if (isWhite) {
-          appendText(ctx.container, moveNumber + ". ");
-        } else if (ctx.lastWasInterrupt) {
-          appendText(ctx.container, moveNumber + "... ");
-        }
+        if (isWhite) appendText(ctx.container, moveNo + ". ");
+        else if (ctx.lastWasInterrupt) appendText(ctx.container, moveNo + "... ");
       } else {
-        if (isWhite) {
-          appendText(ctx.container, moveNumber + ". ");
-        } else if (ctx.lastWasInterrupt) {
-          appendText(ctx.container, moveNumber + "... ");
-        }
+        if (isWhite) appendText(ctx.container, moveNo + ". ");
+        else if (ctx.lastWasInterrupt) appendText(ctx.container, moveNo + "... ");
       }
 
       ctx.prevFen = ctx.chess.fen();
-      ctx.prevHistoryLen = baseLen + localHist;
+      ctx.prevHistoryLen = ply;
 
       const mv = ctx.chess.move(core, { sloppy: true });
       if (!mv) {
         appendText(ctx.container, displayToken + " ");
-        this.lastLiteralToken = displayToken;
+        this.lastWasMove = false;
         return null;
       }
 
       ctx.lastWasInterrupt = false;
       this.lastLiteralToken = null;
+      this.lastWasMove = true;
 
       const span = document.createElement("span");
       span.className = "pgn-move sticky-move";
@@ -208,37 +204,44 @@
       return span;
     }
 
-    // *** COMMENTS — always their own paragraph ***
+    // --- Brace comment { ... } ---
     parseComment(movetext, pos, ctx) {
-      const n = movetext.length;
-      let idx = pos;
-
-      // read until closing brace
-      while (idx < n && movetext[idx] !== "}") idx++;
-      const content = movetext.substring(pos, idx);
-      if (idx < n && movetext[idx] === "}") idx++;
+      let i = pos;
+      while (i < movetext.length && movetext[i] !== "}") i++;
+      const content = movetext.substring(pos, i).trim();
+      if (movetext[i] === "}") i++;
 
       const parts = content.split("[D]");
+
       for (let k = 0; k < parts.length; k++) {
         const text = parts[k].trim();
-        if (text) {
-          const p = document.createElement("p");
-          p.className = "pgn-comment";
-          appendText(p, text);
-          this.wrapper.appendChild(p);
+
+        if (ctx.type === "variation") {
+          // VARYANTTA → inline
+          this.ensureParagraph(ctx, "pgn-variation");
+          if (text) appendText(ctx.container, " " + text);
+        } else {
+          // MAINLINE → ayrı paragraf
+          if (text) {
+            const p = document.createElement("p");
+            p.className = "pgn-comment";
+            appendText(p, text);
+            this.wrapper.appendChild(p);
+          }
+          ctx.container = null;
         }
-        if (k < parts.length - 1) {
-          createDiagram(this.wrapper, ctx.chess.fen());
-        }
+
+        if (k < parts.length - 1) createDiagram(this.wrapper, ctx.chess.fen());
       }
 
       ctx.lastWasInterrupt = true;
-      ctx.container = null;
       this.lastLiteralToken = null;
+      this.lastWasMove = false;
 
-      return idx;
+      return i;
     }
 
+    // --- MOVETEXT ---
     buildMovetextDOM(movetext) {
       const mainChess = new Chess();
 
@@ -254,14 +257,13 @@
       };
 
       let i = 0;
-      const n = movetext.length;
 
-      while (i < n) {
+      while (i < movetext.length) {
         const ch = movetext[i];
 
         // whitespace
         if (/\s/.test(ch)) {
-          while (i < n && /\s/.test(movetext[i])) i++;
+          while (i < movetext.length && /\s/.test(movetext[i])) i++;
           this.ensureParagraph(
             ctx,
             ctx.type === "main" ? "pgn-mainline" : "pgn-variation"
@@ -273,23 +275,24 @@
         // variation start
         if (ch === "(") {
           i++;
-
-          const branchFen = ctx.prevFen || ctx.chess.fen();
-          const branchLen =
+          const fen = ctx.prevFen || ctx.chess.fen();
+          const hist =
             typeof ctx.prevHistoryLen === "number"
               ? ctx.prevHistoryLen
               : ctx.chess.history().length;
 
           ctx = {
             type: "variation",
-            chess: new Chess(branchFen),
+            chess: new Chess(fen),
             container: null,
             parent: ctx,
             lastWasInterrupt: true,
-            prevFen: branchFen,
-            prevHistoryLen: branchLen,
-            baseHistoryLen: branchLen
+            prevFen: fen,
+            prevHistoryLen: hist,
+            baseHistoryLen: hist
           };
+
+          // varyant TEK paragraf
           this.ensureParagraph(ctx, "pgn-variation");
           continue;
         }
@@ -300,32 +303,33 @@
           if (ctx.parent) {
             ctx = ctx.parent;
             ctx.lastWasInterrupt = true;
-            ctx.container = null;
+            ctx.container = null; // mainline’a dönünce YENİ paragraf
           }
           continue;
         }
 
-        // comment block
+        // brace comment
         if (ch === "{") {
           i = this.parseComment(movetext, i + 1, ctx);
           continue;
         }
 
-        // read token
+        // token
         const start = i;
-        while (i < n) {
-          const c2 = movetext[i];
-          if (/\s/.test(c2) || "(){}".includes(c2)) break;
+        while (
+          i < movetext.length &&
+          !/\s/.test(movetext[i]) &&
+          !"(){}".includes(movetext[i])
+        )
           i++;
-        }
-        let token = movetext.substring(start, i);
+
+        const token = movetext.substring(start, i);
         if (!token) continue;
 
         if (token === "[D]") {
           createDiagram(this.wrapper, ctx.chess.fen());
           ctx.lastWasInterrupt = true;
           ctx.container = null;
-          this.lastLiteralToken = null;
           continue;
         }
 
@@ -335,46 +339,50 @@
             ctx.type === "main" ? "pgn-mainline" : "pgn-variation"
           );
           appendText(ctx.container, token + " ");
-          this.lastLiteralToken = token;
           continue;
         }
 
-        if (MOVE_NUMBER_REGEX.test(token)) {
-          continue;
-        }
+        if (MOVE_NUMBER_REGEX.test(token)) continue;
 
-        const strippedCore = token
+        const stripped = token
           .replace(/[^a-hKQRBN0-9=O0-]+$/g, "")
           .replace(/0/g, "O");
-        const looksLikeSAN = PGNGameView.isSANCore(strippedCore);
 
-        if (!looksLikeSAN) {
-          if (EVAL_TOKEN.test(token) && token === this.lastLiteralToken) {
-            continue;
-          }
+        const isSAN = PGNGameView.isSANCore(stripped);
 
+        if (!isSAN) {
           const hasLetters = /[A-Za-zÇĞİÖŞÜçğıöşü]/.test(token);
 
+          if (EVAL_TOKEN.test(token) && token === this.lastLiteralToken) continue;
+
           if (hasLetters) {
-            const p = document.createElement("p");
-            p.className = "pgn-comment";
-            appendText(p, token);
-            this.wrapper.appendChild(p);
-            this.lastLiteralToken = token;
-            ctx.lastWasInterrupt = true;
-            ctx.container = null;
+            if (ctx.type === "variation") {
+              // varyantta inline
+              this.ensureParagraph(ctx, "pgn-variation");
+              appendText(ctx.container, " " + token);
+            } else {
+              // mainline → ayrı paragraf
+              const p = document.createElement("p");
+              p.className = "pgn-comment";
+              appendText(p, token);
+              this.wrapper.appendChild(p);
+              ctx.container = null;
+              ctx.lastWasInterrupt = true;
+            }
           } else {
             this.ensureParagraph(
               ctx,
               ctx.type === "main" ? "pgn-mainline" : "pgn-variation"
             );
             appendText(ctx.container, token + " ");
-            this.lastLiteralToken = token;
           }
 
+          this.lastLiteralToken = token;
+          this.lastWasMove = false;
           continue;
         }
 
+        // SAN move
         this.ensureParagraph(
           ctx,
           ctx.type === "main" ? "pgn-mainline" : "pgn-variation"
@@ -382,7 +390,6 @@
         const sanSpan = this.handleSAN(token, ctx);
         if (!sanSpan) {
           appendText(ctx.container, token + " ");
-          this.lastLiteralToken = token;
         }
       }
     }
